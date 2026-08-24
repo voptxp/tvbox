@@ -146,6 +146,16 @@
    "filterable": 1
   },
   {
+   "key": "18J",
+   "name": "18J[采集]",
+   "type": 3,
+   "api": "csp_XBPQ",
+   "searchable": 1,
+   "quickSearch": 1,
+   "filterable": 0,
+   "ext": "./js/s/18j.json"
+  },
+  {
    "key": "py_蛋挞",
    "name": "蛋挞影视[py]",
    "type": 3,
