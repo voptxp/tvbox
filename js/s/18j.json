@@ -22,11 +22,12 @@
   "搜索标题": "title=\"&&\"",
   "搜索链接": "href=\"&&\"",
   "搜索链接前缀": "https://18j.tv",
+  "影片类型": "property=\"video:section\" content=\"&&\"",
+  "主演": "property=\"video:actor\" content=\"&&\"",
+  "简介": "name=\"description\" content=\"&&\"",
   "播放数组": "<script type=\"text/javascript\">&&</script>",
   "播放列表": "const source&&;",
   "播放标题": ">&&<",
   "播放链接": "source = '&&'",
-  "影片类型": "property=\"video:section\" content=\"&&\"",
-  "主演": "property=\"video:actor\" content=\"&&\"",
-  "简介": "name=\"description\" content=\"&&\""
+  "播放链接前缀": "http://192.168.0.2:12315/18j.php?url="
 }
