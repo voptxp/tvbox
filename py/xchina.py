@@ -2,9 +2,11 @@
 # by @Codex
 import re
 import json
+import time
 from urllib.parse import quote
 from html import unescape
 from pyquery import PyQuery as pq
+import requests
 import sys
 sys.path.append('..')
 from base.spider import Spider
@@ -12,8 +14,12 @@ from base.spider import Spider
 
 class Spider(Spider):
 
+    host = "https://xchina.co"
+
     def init(self, extend=""):
-        pass
+        self.host = "https://xchina.co"
+        self._session()
+        self._warm()
 
     def getName(self):
         pass
@@ -36,13 +42,59 @@ class Spider(Spider):
         'Sec-Ch-Ua-Platform': '"Windows"',
         'Sec-Fetch-Dest': 'document',
         'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-Site': 'same-origin',
         'Sec-Fetch-User': '?1',
         'Upgrade-Insecure-Requests': '1',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
     }
 
-    host = "https://xchina.co"
+    def _session(self):
+        if not hasattr(self, 'session'):
+            self.session = requests.Session()
+        self.session.headers.update(self.headers)
+        return self.session
+
+    def _warm(self):
+        """先访问一次首页，建立会话 Cookie，降低被 Cloudflare 挑战的概率。"""
+        try:
+            self._session().get(self.host + '/', timeout=15)
+        except Exception:
+            pass
+
+    def _referer(self, path):
+        if '/video/' in path or '/videos/series-' in path:
+            return f"{self.host}/videos.html"
+        return f"{self.host}/"
+
+    def _get(self, path, retries=3):
+        url = path if path.startswith('http') else f"{self.host}{path}"
+        for attempt in range(retries):
+            try:
+                r = self._session().get(url, headers={'Referer': self._referer(path)}, timeout=20)
+                text = r.text or ''
+                if self._is_challenge(r, text):
+                    time.sleep(0.8 * (attempt + 1))
+                    self._warm()
+                    continue
+                return text
+            except requests.RequestException:
+                if attempt == retries - 1:
+                    raise
+                time.sleep(0.5 * (attempt + 1))
+        raise Exception('request failed: %s' % url)
+
+    def _is_challenge(self, r, text):
+        if r.status_code in (403, 503):
+            return True
+        low = (text or '')[:3000].lower()
+        return any(k in low for k in ('just a moment', 'attention required', 'cf-chl', 'enable javascript'))
+
+    def getpq(self, path=''):
+        data = self._get(path)
+        try:
+            return pq(data)
+        except Exception:
+            return pq(data.encode('utf-8'))
 
     def homeContent(self, filter):
         data = self.getpq('')
@@ -111,10 +163,12 @@ class Spider(Spider):
     def playerContent(self, flag, id, vipFlags):
         page_url = id if id.startswith('http') else f"{self.host}{id}"
         try:
-            html = self.fetch(page_url, headers=self.headers).text
+            html = self._get(page_url)
             m = re.search(r"src:\s*'([^']+\.m3u8[^']*)'", html)
             if not m:
                 m = re.search(r'src:\s*"([^"]+\.m3u8[^"]*)"', html)
+            if not m:
+                m = re.search(r'https?://[^"\'\s]+\.m3u8[^"\'\s]*', html)
             if not m:
                 raise Exception('未找到播放地址')
             url = m.group(1)
@@ -124,7 +178,7 @@ class Spider(Spider):
                 'User-Agent': self.headers.get('User-Agent', '')
             }
             return {'parse': 0, 'url': url, 'header': headers}
-        except Exception as e:
+        except Exception:
             headers = {
                 'Referer': f'{self.host}/',
                 'origin': self.host,
@@ -200,12 +254,3 @@ class Spider(Spider):
             return ''
         m = re.search(r"url\(['\"]?([^'\")]+)", style)
         return m.group(1) if m else ''
-
-    def getpq(self, path=''):
-        url = path if path.startswith('http') else f"{self.host}{path}"
-        data = self.fetch(url, headers=self.headers).text
-        try:
-            return pq(data)
-        except Exception as e:
-            print(str(e))
-            return pq(data.encode('utf-8'))
