@@ -11,13 +11,28 @@ import sys
 sys.path.append('..')
 from base.spider import Spider
 
+try:
+    from curl_cffi import requests as _cffi_requests
+    HAS_CFFI = True
+except Exception:
+    _cffi_requests = None
+    HAS_CFFI = False
+
 
 class Spider(Spider):
 
     host = "https://xchina.co"
+    proxy = ""  # 例如 "http://192.168.0.2:12315/xchina_proxy.php"
 
     def init(self, extend=""):
         self.host = "https://xchina.co"
+        self.proxy = ""
+        if extend:
+            try:
+                cfg = json.loads(extend)
+                self.proxy = (cfg.get("proxy") or "").rstrip("/")
+            except Exception:
+                pass
         self._session()
         self._warm()
 
@@ -66,13 +81,44 @@ class Spider(Spider):
             return f"{self.host}/videos.html"
         return f"{self.host}/"
 
-    def _get(self, path, retries=3):
+    def _get_html(self, path):
+        """获取页面 HTML，按 代理 -> curl_cffi -> requests 的顺序选择可用通道。"""
         url = path if path.startswith('http') else f"{self.host}{path}"
+        referer = self._referer(path)
+
+        if self.proxy:
+            # 服务端代理：由代理服务器用 curl 抓取，绕过 Cloudflare 的 TLS 指纹拦截
+            fetch_url = f"{self.proxy}?url={quote(url, safe='')}"
+            return self._fetch_retry(fetch_url, referer=url)
+
+        if HAS_CFFI:
+            return self._fetch_retry_cffi(url, referer)
+
+        return self._fetch_retry_requests(url, referer)
+
+    def _fetch_retry(self, fetch_url, referer, retries=3):
+        """通过基类 self.fetch 请求代理/普通地址。"""
         for attempt in range(retries):
             try:
-                r = self._session().get(url, headers={'Referer': self._referer(path)}, timeout=20)
+                r = self.fetch(fetch_url, headers=self.headers, timeout=25)
+                text = r.text if hasattr(r, 'text') else ''
+                code = r.status_code if hasattr(r, 'status_code') else 200
+                if self._is_challenge(code, text):
+                    time.sleep(0.8 * (attempt + 1))
+                    continue
+                return text
+            except Exception:
+                if attempt == retries - 1:
+                    raise
+                time.sleep(0.5 * (attempt + 1))
+        raise Exception('request failed: %s' % fetch_url)
+
+    def _fetch_retry_requests(self, url, referer, retries=3):
+        for attempt in range(retries):
+            try:
+                r = self._session().get(url, headers={'Referer': referer}, timeout=20)
                 text = r.text or ''
-                if self._is_challenge(r, text):
+                if self._is_challenge(r.status_code, text):
                     time.sleep(0.8 * (attempt + 1))
                     self._warm()
                     continue
@@ -83,14 +129,31 @@ class Spider(Spider):
                 time.sleep(0.5 * (attempt + 1))
         raise Exception('request failed: %s' % url)
 
-    def _is_challenge(self, r, text):
-        if r.status_code in (403, 503):
+    def _fetch_retry_cffi(self, url, referer, retries=3):
+        for attempt in range(retries):
+            try:
+                r = _cffi_requests.get(url, impersonate='chrome',
+                                       headers={'Referer': referer, 'Accept-Language': 'zh-CN,zh;q=0.9'},
+                                       timeout=20)
+                text = r.text or ''
+                if self._is_challenge(r.status_code, text):
+                    time.sleep(0.8 * (attempt + 1))
+                    continue
+                return text
+            except Exception:
+                if attempt == retries - 1:
+                    raise
+                time.sleep(0.5 * (attempt + 1))
+        raise Exception('request failed: %s' % url)
+
+    def _is_challenge(self, code, text):
+        if code in (403, 503):
             return True
         low = (text or '')[:3000].lower()
         return any(k in low for k in ('just a moment', 'attention required', 'cf-chl', 'enable javascript'))
 
     def getpq(self, path=''):
-        data = self._get(path)
+        data = self._get_html(path)
         try:
             return pq(data)
         except Exception:
@@ -163,7 +226,7 @@ class Spider(Spider):
     def playerContent(self, flag, id, vipFlags):
         page_url = id if id.startswith('http') else f"{self.host}{id}"
         try:
-            html = self._get(page_url)
+            html = self._get_html(page_url)
             m = re.search(r"src:\s*'([^']+\.m3u8[^']*)'", html)
             if not m:
                 m = re.search(r'src:\s*"([^"]+\.m3u8[^"]*)"', html)
