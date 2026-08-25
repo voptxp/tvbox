@@ -22,7 +22,7 @@
    "api": "./js/avtime.js",
    "searchable": 1,
    "quickSearch": 1,
-   "filterable": 0,
+   "filterable": 0
   },
   {
    "key": "apple",
