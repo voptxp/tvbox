@@ -172,9 +172,6 @@
       "searchable": 1,
       "quickSearch": 1,
       "filterable": 0,
-      "ext": {
-        "proxy": "http://192.168.0.2:12315/avtime_proxy.php"
-      }
   },
   {
    "key": "py_125av",
