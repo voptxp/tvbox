@@ -165,6 +165,18 @@
    "filterable": 0
   },
   {
+   "key": "py_125av",
+   "name": "125AV[py]",
+   "type": 3,
+   "api": "./py/125av.py",
+   "quickSearch": 1,
+   "searchable": 1,
+   "filterable": 0,
+   "ext": {
+    "proxy": "https://192.168.0.2:12315/php/125av_proxy.php"
+   }
+  },
+  {
    "key": "py_蛋挞",
    "name": "蛋挞影视[py]",
    "type": 3,
