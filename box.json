@@ -192,7 +192,10 @@
    "api": "./py/xchina.py",
    "quickSearch": 1,
    "searchable": 1,
-   "filterable": 0
+   "filterable": 0,
+   "ext": {
+    "proxy": "http://192.168.0.2:12315/xchina_proxy.php"
+   }
   },
   {
    "key": "py_蛋挞",
