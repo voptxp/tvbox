@@ -156,6 +156,15 @@
    "ext": "./js/s/18j.json"
   },
   {
+   "key": "py_madou",
+   "name": "麻豆[py]",
+   "type": 3,
+   "api": "./py/madou.py",
+   "quickSearch": 1,
+   "searchable": 1,
+   "filterable": 0
+  },
+  {
    "key": "py_蛋挞",
    "name": "蛋挞影视[py]",
    "type": 3,
