@@ -165,13 +165,13 @@
    "filterable": 0
   },
   {
-      "key": "avtime",
-      "name": "AV时间[js]",
-      "type": 3,
-      "api": "./avtime.js",
-      "searchable": 1,
-      "quickSearch": 1,
-      "filterable": 0,
+   "key": "avtime",
+   "name": "AV时间[js]",
+   "type": 3,
+   "api": "./js/avtime.js",
+   "searchable": 1,
+   "quickSearch": 1,
+   "filterable": 0,
   },
   {
    "key": "py_125av",
