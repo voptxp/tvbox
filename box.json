@@ -165,13 +165,16 @@
    "filterable": 0
   },
   {
-   "key": "avtime",
-   "name": "AV时间[js]",
-   "type": 3,
-   "api": "./js/avtime.js",
-   "searchable": 1,
-   "quickSearch": 1,
-   "filterable": 0
+      "key": "avtime",
+      "name": "AV时间[js]",
+      "type": 3,
+      "api": "./avtime.js",
+      "searchable": 1,
+      "quickSearch": 1,
+      "filterable": 0,
+      "ext": {
+        "proxy": "http://192.168.0.2:12315/avtime_proxy.php"
+      }
   },
   {
    "key": "py_125av",
