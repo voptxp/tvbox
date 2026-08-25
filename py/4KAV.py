@@ -83,7 +83,7 @@ class Spider(Spider):
         return {'list': [vod]}
 
     def searchContent(self, key, quick, pg="1"):
-        data=self.getpq(f"/s?k={key}")
+        data=self.getpq(f"/s?x={key}")
         return {'list':self.getlist(data('#MainContent_newestlist .virow.search .NTMitem.Main'))}
 
     def playerContent(self, flag, id, vipFlags):
