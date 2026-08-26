@@ -191,7 +191,7 @@
    "searchable": 1,
    "filterable": 0,
    "ext": {
-    "proxy": "http://192.168.0.3:12316"
+    "proxy": "http://192.168.0.103:12316"
    }
   },
   {
