@@ -194,7 +194,7 @@
    "searchable": 1,
    "filterable": 0,
    "ext": {
-    "proxy": "http://192.168.0.3/xchina_proxy.php"
+    "proxy": "http://192.168.0.3:12316"
    }
   },
   {
