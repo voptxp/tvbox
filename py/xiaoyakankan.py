@@ -60,15 +60,21 @@ class Spider(Spider):
 
     # ------------------------------------------------------------------ TVBox 接口
     def homeContent(self, filter):
-        data = self.getpq('/')
+        # 以福利页 /cat/15.html 为首页：既含分类导航，也含福利影片列表
+        data = self.getpq('/cat/15.html')
         classes = []
         seen = set()
         for a in data('a[href^="/cat/"]').items():
             href = a.attr('href')
             name = a.text().strip()
-            if href and name and re.match(r'^/cat/\d+\.html$', href) and href not in seen:
+            if not href or not name:
+                continue
+            # 只保留福利及其情色片子分类（/cat/15.html、/cat/15xx.html）
+            if re.match(r'^/cat/15\d{0,2}\.html$', href) and href not in seen:
                 seen.add(href)
                 classes.append({'type_name': name, 'type_id': href})
+        # 福利分类放到最前，其余按导航顺序
+        classes.sort(key=lambda c: (c['type_id'] != '/cat/15.html', c['type_id']))
         return {'class': classes, 'list': self.getlist(data('div.item'))}
 
     def homeVideoContent(self):
@@ -178,3 +184,4 @@ class Spider(Spider):
                 'vod_remarks': remarks,
             })
         return videos
+
