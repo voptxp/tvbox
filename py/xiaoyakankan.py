@@ -33,8 +33,7 @@ class Spider(Spider):
     }
 
     def init(self, extend=""):
-        self._session = requests.Session()
-        self._session.headers.update(self.headers)
+        pass
 
     def getName(self):
         pass
@@ -51,7 +50,15 @@ class Spider(Spider):
     # ------------------------------------------------------------------ 网络层
     def _get(self, path):
         url = path if path.startswith('http') else f"{self.host}{path}"
-        r = self._session.get(url, timeout=15)
+        # 优先用基类 self.fetch（TVBox 运行时最稳妥的通道）
+        try:
+            r = self.fetch(url, headers=self.headers, timeout=15)
+            if hasattr(r, 'text'):
+                return r.text
+        except Exception:
+            pass
+        # 兜底：requests
+        r = requests.get(url, headers=self.headers, timeout=15)
         r.encoding = 'utf-8'
         return r.text
 
@@ -184,4 +191,5 @@ class Spider(Spider):
                 'vod_remarks': remarks,
             })
         return videos
+
 
