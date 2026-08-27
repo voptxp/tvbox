@@ -16,6 +16,15 @@
    "api": "./js/荐片.js"
   },
   {
+   "key": "py_dygangs",
+   "name": "电影港[磁]",
+   "type": 3,
+   "api": "./py/dygangs.py",
+   "quickSearch": 1,
+   "searchable": 1,
+   "filterable": 0
+  },
+  {
    "key": "avtime",
    "name": "AV时间[js]",
    "type": 3,
