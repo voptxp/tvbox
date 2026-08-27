@@ -277,6 +277,15 @@
    "ext": "./js/s/小镇.json"
   },
   {
+  "key": "py_glsbc",
+  "name": "伦理片高清[py]",
+  "type": 3,
+  "api": "./py/glsbc.py",
+  "quickSearch": 1,
+  "searchable": 1,
+  "filterable": 0
+  },
+  {
    "key": "西瓜",
    "name": "西瓜影视",
    "type": 3,
