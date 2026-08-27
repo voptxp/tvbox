@@ -195,6 +195,15 @@
    }
   },
   {
+  "key": "py_xiaoyakankan",
+  "name": "小鸭看看[py]",
+  "type": 3,
+  "api": "./py/xiaoyakankan.py",
+  "quickSearch": 0,
+  "searchable": 0,
+  "filterable": 0
+  },
+  {
   "key": "py_qinav",
   "name": "Qinav[py]",
   "type": 3,
