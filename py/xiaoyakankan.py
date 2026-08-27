@@ -24,7 +24,6 @@ class Spider(Spider):
     USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                   "(KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36")
 
-    # 与仓库内能正常工作的爬虫保持一致：小写请求头
     headers = {
         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
@@ -61,7 +60,6 @@ class Spider(Spider):
 
     # ------------------------------------------------------------------ TVBox 接口
     def homeContent(self, filter):
-        # 以福利页 /cat/15.html 为首页：既含分类导航，也含福利影片列表
         data = self.getpq('/cat/15.html')
         classes = []
         seen = set()
@@ -70,11 +68,9 @@ class Spider(Spider):
             name = a.text().strip()
             if not href or not name:
                 continue
-            # 只保留福利及其情色片子分类（/cat/15.html、/cat/15xx.html）
             if re.match(r'^/cat/15\d{0,2}\.html$', href) and href not in seen:
                 seen.add(href)
                 classes.append({'type_name': name, 'type_id': href})
-        # 福利分类放到最前
         classes.sort(key=lambda c: (c['type_id'] != '/cat/15.html', c['type_id']))
         return {'class': classes, 'list': self.getlist(data('div.item'))}
 
@@ -130,8 +126,8 @@ class Spider(Spider):
                         epname = '正片' if len(urllist) == 1 else f'第{i + 1}集'
                         eps.append(f'{epname}${u}')
                     urls.append('#'.join(eps))
-                play_from = '$$'.join(froms)
-                play_url = '$$'.join(urls)
+                play_from = '$$$'.join(froms)
+                play_url = '$$$'.join(urls)
             except Exception:
                 pass
 
@@ -145,7 +141,6 @@ class Spider(Spider):
         return {'list': [vod]}
 
     def searchContent(self, key, quick, pg="1"):
-        # 无站内搜索
         return {'list': []}
 
     def playerContent(self, flag, id, vipFlags):
@@ -155,8 +150,8 @@ class Spider(Spider):
             'jx': 0,
             'url': url,
             'header': {
-                'User-Agent': self.USER_AGENT,
-                'Referer': self.host + '/',
+                'user-agent': self.USER_AGENT,
+                'referer': self.host + '/',
             },
         }
 
