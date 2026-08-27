@@ -1,17 +1,16 @@
 # -*- coding: utf-8 -*-
-# 小鸭看看 (xiaoyakankan.com) TVBox 采集爬虫
+# 小鸭看看 (xiaoyakankan.com) TVBox 采集爬虫（福利/情色片）
 #
 # 结构：
-#   首页   /                         (.item 列表)
-#   分类   /cat/{id}.html            分页 /cat/{id}-{page}.html
-#   详情   /post/{hexid}.html        (h1/封面/简介 + var pp={...} 播放线路)
-#   搜索   无站内搜索（用 Google 站内搜索），故 searchable=0
+#   首页   /                           (.item 列表)
+#   福利   /cat/15.html                (福利首页，含分类导航 + 福利列表)
+#   分类   /cat/{id}.html              分页 /cat/{id}-{page}.html
+#   详情   /post/{hexid}.html          (h1/封面/简介 + var pp={...} 播放线路)
 #
 # 播放地址：详情页内嵌 JS： var pp={"no":..,"lines":[["id","线路名",1,["m3u8地址"]]]}
 import re
 import json
 import sys
-import requests
 from pyquery import PyQuery as pq
 
 sys.path.append('..')
@@ -25,11 +24,12 @@ class Spider(Spider):
     USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                   "(KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36")
 
+    # 与仓库内能正常工作的爬虫保持一致：小写请求头
     headers = {
-        'User-Agent': USER_AGENT,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-        'Referer': 'https://xiaoyakankan.com/',
+        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        'user-agent': USER_AGENT,
+        'referer': 'https://xiaoyakankan.com/',
     }
 
     def init(self, extend=""):
@@ -50,20 +50,14 @@ class Spider(Spider):
     # ------------------------------------------------------------------ 网络层
     def _get(self, path):
         url = path if path.startswith('http') else f"{self.host}{path}"
-        # 优先用基类 self.fetch（TVBox 运行时最稳妥的通道）
-        try:
-            r = self.fetch(url, headers=self.headers, timeout=15)
-            if hasattr(r, 'text'):
-                return r.text
-        except Exception:
-            pass
-        # 兜底：requests
-        r = requests.get(url, headers=self.headers, timeout=15)
-        r.encoding = 'utf-8'
-        return r.text
+        return self.fetch(url, headers=self.headers).text
 
     def getpq(self, path=''):
-        return pq(self._get(path))
+        data = self._get(path)
+        try:
+            return pq(data)
+        except Exception:
+            return pq(data.encode('utf-8'))
 
     # ------------------------------------------------------------------ TVBox 接口
     def homeContent(self, filter):
@@ -80,7 +74,7 @@ class Spider(Spider):
             if re.match(r'^/cat/15\d{0,2}\.html$', href) and href not in seen:
                 seen.add(href)
                 classes.append({'type_name': name, 'type_id': href})
-        # 福利分类放到最前，其余按导航顺序
+        # 福利分类放到最前
         classes.sort(key=lambda c: (c['type_id'] != '/cat/15.html', c['type_id']))
         return {'class': classes, 'list': self.getlist(data('div.item'))}
 
@@ -158,6 +152,7 @@ class Spider(Spider):
         url = id if id.startswith('http') else id
         return {
             'parse': 0,
+            'jx': 0,
             'url': url,
             'header': {
                 'User-Agent': self.USER_AGENT,
@@ -175,7 +170,7 @@ class Spider(Spider):
     def getlist(self, data):
         videos = []
         for it in data.items():
-            a = it('a.link').eq(0)
+            a = it('a.link')
             href = a.attr('href')
             if not href:
                 continue
@@ -191,5 +186,3 @@ class Spider(Spider):
                 'vod_remarks': remarks,
             })
         return videos
-
-
