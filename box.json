@@ -34,6 +34,15 @@
   "filterable": 0
   },
   {
+  "key": "py_piaohua",
+  "name": "飘花电影[py]",
+  "type": 3,
+  "api": "./py/piaohua.py",
+  "quickSearch": 1,
+  "searchable": 1,
+  "filterable": 0
+  },
+  {
    "key": "avtime",
    "name": "AV时间[js]",
    "type": 3,
