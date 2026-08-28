@@ -152,10 +152,12 @@ class Spider(Spider):
         desc = ' | '.join(parts)
 
         gid_m = re.search(r'var gid = ([0-9]+);', raw)
+        uc_m = re.search(r'var uc = ([0-9]+);', raw)
+        uc = uc_m.group(1) if uc_m else '0'
         magnets = []
         if gid_m:
             ref = ids[0] if ids[0].startswith('http') else self.host + ids[0]
-            mag_html = self._get(f'/ajax/uncledatoolsbyajax.php?gid={gid_m.group(1)}&uc=0&lang=zh', referer=ref)
+            mag_html = self._get(f'/ajax/uncledatoolsbyajax.php?gid={gid_m.group(1)}&uc={uc}&lang=zh', referer=ref)
             magnets = self._parse_magnets(pq(mag_html))
 
         play_from = ''
@@ -225,7 +227,7 @@ class Spider(Spider):
             url = 'https:' + url
         elif url.startswith('/'):
             url = self.host + url
-        if self.img_proxy and url.startswith(self.host + '/pics/'):
+        if self.img_proxy and (url.startswith(self.host + '/pics/') or url.startswith(self.host + '/imgs/')):
             return self.img_proxy + '?url=' + quote(url, safe='')
         return url
 
