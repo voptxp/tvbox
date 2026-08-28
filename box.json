@@ -231,6 +231,15 @@
    }
   },
   {
+  "key": "py_javbus",
+  "name": "JavBus磁力[py]",
+  "type": 3,
+  "api": "./py/javbus.py",
+  "quickSearch": 1,
+  "searchable": 1,
+  "filterable": 0
+  },
+  {
   "key": "py_xiaoyakankan",
   "name": "小鸭看看[py]",
   "type": 3,
