@@ -13,6 +13,7 @@
 #
 # 播放地址：magnet:?xt=urn:btih:...（多磁力，含 高清/字幕/容量）
 import re
+import json
 import sys
 import requests
 from urllib.parse import quote
@@ -25,6 +26,26 @@ from base.spider import Spider
 class Spider(Spider):
 
     host = 'https://www.javbus.com'
+
+    img_proxy = ''
+    TRACKERS = [
+        'udp://tracker.opentrackr.org:1337/announce',
+        'udp://open.tracker.cl:1337/announce',
+        'udp://tracker.torrent.eu.org:451/announce',
+        'udp://explodie.org:6969/announce',
+        'udp://exodus.desync.com:6969/announce',
+        'udp://open.stealth.si:80/announce',
+        'udp://tracker.tiny-vps.com:6969/announce',
+        'udp://tracker.moeking.me:6969/announce',
+        'udp://p4p.arenabg.com:1337/announce',
+        'udp://tracker.cyberia.is:6969/announce',
+        'udp://opentracker.i2p.rocks:6969/announce',
+        'udp://open.demonii.com:1337/announce',
+        'udp://tracker.openbittorrent.com:6969/announce',
+        'http://tracker.openbittorrent.com:80/announce',
+        'https://tracker.tamershare.org:443/announce',
+        'http://tracker.renren.pro:2020/announce',
+    ]
 
     USER_AGENT = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
                   '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
@@ -44,7 +65,13 @@ class Spider(Spider):
     ]
 
     def init(self, extend=''):
-        pass
+        self.img_proxy = ''
+        if extend:
+            try:
+                cfg = json.loads(extend) if isinstance(extend, str) else extend
+                self.img_proxy = (cfg.get('img_proxy') or '').rstrip('/')
+            except Exception:
+                pass
 
     def getName(self):
         pass
@@ -117,11 +144,7 @@ class Spider(Spider):
             t = data('title').text().strip()
             vod_name = t.replace(' - JavBus', '').strip()
 
-        pic = data('a.bigImage img').attr('src') or ''
-        if pic.startswith('//'):
-            pic = 'https:' + pic
-        elif pic.startswith('/'):
-            pic = self.host + pic
+        pic = self._pic(data('a.bigImage img').attr('src') or '')
 
         fid = self._field(data, '識別碼')
         rel = self._field(data, '發行日期')
@@ -203,6 +226,22 @@ class Spider(Spider):
                 return full.replace(h.text().strip(), '', 1).strip()
         return ''
 
+    def _pic(self, url):
+        if not url:
+            return url
+        if url.startswith('//'):
+            url = 'https:' + url
+        elif url.startswith('/'):
+            url = self.host + url
+        if self.img_proxy and url.startswith(self.host + '/pics/'):
+            return self.img_proxy + '?url=' + quote(url, safe='')
+        return url
+
+    def _with_trackers(self, url):
+        if '&tr=' in url:
+            return url
+        return url + ''.join('&tr=' + quote(t, safe='') for t in self.TRACKERS)
+
     def _parse_magnets(self, data):
         magnets = []
         seen = set()
@@ -216,6 +255,7 @@ class Spider(Spider):
             if not mag_url or mag_url in seen:
                 continue
             seen.add(mag_url)
+            mag_url = self._with_trackers(mag_url)
             first_td = tr('td').eq(0)
             badges = []
             for b in first_td('a').items():
@@ -239,11 +279,7 @@ class Spider(Spider):
             seen.add(href)
             img = a('img').eq(0)
             title = img.attr('title') or ''
-            pic = img.attr('src') or ''
-            if pic.startswith('//'):
-                pic = 'https:' + pic
-            elif pic.startswith('/'):
-                pic = self.host + pic
+            pic = self._pic(img.attr('src') or '')
             dates = a('.photo-info date')
             date = dates.eq(dates.length - 1).text().strip() if dates.length else ''
             if not title:
