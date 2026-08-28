@@ -193,13 +193,19 @@ class Spider(Spider):
     def getlist(self, data):
         videos = []
         seen = set()
-        for a in data('a[href]').items():
+        # 只取正文容器 #post_container 里的 li.post，避开每个页面都相同的“最新电影”侧边栏
+        for it in data('#post_container li.post').items():
+            a = it('h2 a').eq(0)
             href = a.attr('href') or ''
-            # 详情链接形如 /juqingpian/29466.html 或 /dianshiju/guoju/29365.html
-            if not re.search(r'/\d+\.html$', href):
-                continue
-            title = a.text().strip()
+            title = a.attr('title') or a.text().strip() or ''
             if not title:
+                title = it('a[rel="bookmark"]').attr('title') or ''
+            title = re.sub(r'<[^>]+>', '', title).strip()
+            pic = it('.thumbnail img').attr('src') or ''
+            if pic.startswith('//'):
+                pic = 'https:' + pic
+            date = it('.info_date').text().strip() or ''
+            if not href or not title:
                 continue
             if href in seen:
                 continue
@@ -207,7 +213,9 @@ class Spider(Spider):
             videos.append({
                 'vod_id': href,
                 'vod_name': title,
-                'vod_pic': '',
-                'vod_remarks': '',
+                'vod_pic': pic,
+                'vod_remarks': date,
             })
         return videos
+
+
