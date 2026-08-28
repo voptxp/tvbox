@@ -12,6 +12,7 @@
 import json
 import sys
 import requests
+from html import unescape
 from urllib.parse import quote
 from pyquery import PyQuery as pq
 
@@ -78,9 +79,7 @@ class Spider(Spider):
         if referer:
             h['referer'] = referer
         try:
-            r = self.fetch(url, headers=h)
-            if hasattr(r, 'text'):
-                return r.text
+            return self.fetch(url, headers=h).text
         except Exception:
             pass
         r = requests.get(url, headers=h, timeout=15)
@@ -88,22 +87,27 @@ class Spider(Spider):
         return r.text
 
     def getpq(self, path='', referer=None):
-        return pq(self._get(path, referer))
+        data = self._get(path, referer)
+        try:
+            return pq(data)
+        except Exception:
+            return pq(data.encode('utf-8'))
 
     # ------------------------------------------------------------------ TVBox 接口
     def homeContent(self, filter):
-        data = self.getpq('/')
+        raw = self._get('/')
+        data = pq(raw)
         classes = [{'type_name': name, 'type_id': '/category/' + slug + '/'} for slug, name in self.CATEGORIES]
-        return {'class': classes, 'list': self.getlist(data)}
+        return {'class': classes, 'list': self.getlist(raw)}
 
     def homeVideoContent(self):
         pass
 
     def categoryContent(self, tid, pg, filter, extend):
         pg = int(pg or 1)
-        data = self.getpq(self._page_path(tid, pg))
+        raw = self._get(self._page_path(tid, pg))
         return {
-            'list': self.getlist(data),
+            'list': self.getlist(raw),
             'page': pg,
             'pagecount': 9999,
             'limit': 90,
@@ -131,7 +135,13 @@ class Spider(Spider):
         if not vod_name:
             vod_name = data('title').text().strip()
 
-        pic = data('img[data-xkrkllgl]').eq(0).attr('data-xkrkllgl') or ''
+        pic = ''
+        i = raw.find('data-xkrkllgl="')
+        if i >= 0:
+            i += len('data-xkrkllgl="')
+            j = raw.find('"', i)
+            if j >= 0:
+                pic = raw[i:j]
         if not pic:
             pic = data('meta[property="og:image"]').attr('content') or ''
         if pic.startswith('//'):
@@ -144,19 +154,25 @@ class Spider(Spider):
 
         lines = []
         seen = set()
-        dplayers = data('.dplayer')
-        total = len(dplayers)
+        total_cfg = raw.count("data-config='")
         vid_no = 0
-        for dp in dplayers.items():
-            cfg = dp.attr('data-config') or ''
-            if not cfg:
-                continue
+        pos = 0
+        while True:
+            i = raw.find("data-config='", pos)
+            if i < 0:
+                break
+            i += len("data-config='")
+            j = raw.find("'", i)
+            if j < 0:
+                break
+            cfg = unescape(raw[i:j])
+            pos = j + 1
             try:
                 obj = json.loads(cfg)
             except Exception:
                 continue
             vid_no += 1
-            prefix = f'视频{vid_no}' if total > 1 else ''
+            prefix = f'视频{vid_no}' if total_cfg > 1 else ''
             items = []
             v = obj.get('video') or {}
             if v.get('url'):
@@ -191,8 +207,8 @@ class Spider(Spider):
         kw = quote((key or '').strip(), safe='')
         path = f'/search/{kw}/' if pg <= 1 else f'/search/{kw}/{pg}/'
         try:
-            data = self.getpq(path)
-            return {'list': self.getlist(data)}
+            raw = self._get(path)
+            return {'list': self.getlist(raw)}
         except Exception:
             return {'list': []}
 
@@ -209,48 +225,55 @@ class Spider(Spider):
         pass
 
     # ------------------------------------------------------------------ 解析工具
-    def getlist(self, data):
+    def getlist(self, html):
         videos = []
         seen = set()
-        for art in data('article').items():
-            itemtype = art.attr('itemtype') or ''
-            if 'BlogPosting' not in itemtype:
+        parts = html.split('<article ')
+        for part in parts[1:]:
+            block = part.split('</article>', 1)[0]
+            if 'BlogPosting' not in block:
                 continue
             href = ''
-            for a in art.find('a').items():
-                h = a.attr('href') or ''
-                if '/archives/' in h:
-                    href = h
-                    break
+            i = block.find('href="/archives/')
+            if i >= 0:
+                i += 6
+                j = block.find('"', i)
+                if j >= 0:
+                    href = block[i:j]
             if not href or href in seen:
                 continue
             seen.add(href)
 
-            title_node = art.find('h2.post-card-title')
-            title_node.find('.wraps').remove()
-            title = title_node.text().strip()
-            if not title:
-                title = art.find('meta[itemprop="headline"]').attr('content') or ''
+            title = ''
+            i = block.find('itemprop="headline">')
+            if i >= 0:
+                i += len('itemprop="headline">')
+                j = block.find('<div', i)
+                if j < 0:
+                    j = block.find('</h2>', i)
+                if j >= 0:
+                    title = unescape(block[i:j]).strip()
             if not title:
                 continue
 
-            art_html = art.html() or ''
             pic = ''
-            i = art_html.find('loadBannerDirect(')
+            i = block.find("loadBannerDirect('")
             if i >= 0:
-                i = art_html.find("'", i)
-                if i >= 0:
-                    j = art_html.find("'", i + 1)
-                    if j >= 0:
-                        pic = art_html[i + 1:j]
+                i += len("loadBannerDirect('")
+                j = block.find("'", i)
+                if j >= 0:
+                    pic = block[i:j]
             if pic.startswith('//'):
                 pic = 'https:' + pic
 
             date = ''
-            for sp in art.find('span').items():
-                if sp.attr('itemprop') == 'datePublished':
-                    date = sp.text().strip()
-                    break
+            i = block.find('itemprop="datePublished"')
+            if i >= 0:
+                i = block.find('>', i)
+                if i >= 0:
+                    j = block.find('<', i + 1)
+                    if j >= 0:
+                        date = block[i + 1:j].strip()
             if date:
                 date = date.replace('•', '').replace('·', '').strip()
 
