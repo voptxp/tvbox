@@ -25,6 +25,15 @@
    "filterable": 0
   },
   {
+  "key": "py_xb6v",
+  "name": "6V电影[磁]",
+  "type": 3,
+  "api": "./py/xb6v.py",
+  "quickSearch": 1,
+  "searchable": 1,
+  "filterable": 0
+  },
+  {
    "key": "avtime",
    "name": "AV时间[js]",
    "type": 3,
