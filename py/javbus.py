@@ -34,17 +34,6 @@ class Spider(Spider):
         'udp://tracker.torrent.eu.org:451/announce',
         'udp://explodie.org:6969/announce',
         'udp://exodus.desync.com:6969/announce',
-        'udp://open.stealth.si:80/announce',
-        'udp://tracker.tiny-vps.com:6969/announce',
-        'udp://tracker.moeking.me:6969/announce',
-        'udp://p4p.arenabg.com:1337/announce',
-        'udp://tracker.cyberia.is:6969/announce',
-        'udp://opentracker.i2p.rocks:6969/announce',
-        'udp://open.demonii.com:1337/announce',
-        'udp://tracker.openbittorrent.com:6969/announce',
-        'http://tracker.openbittorrent.com:80/announce',
-        'https://tracker.tamershare.org:443/announce',
-        'http://tracker.renren.pro:2020/announce',
     ]
 
     USER_AGENT = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
@@ -207,7 +196,10 @@ class Spider(Spider):
 
     def playerContent(self, flag, id, vipFlags):
         url = id
-        if url.startswith('magnet:') or url.startswith('ed2k:') or url.startswith('thunder:'):
+        if url.startswith('magnet:'):
+            url = self._with_trackers(url)
+            return {'parse': 0, 'jx': 0, 'url': url, 'header': {}}
+        if url.startswith('ed2k:') or url.startswith('thunder:'):
             return {'parse': 0, 'jx': 0, 'url': url, 'header': {}}
         return {'parse': 1, 'jx': 0, 'url': url, 'header': {'user-agent': self.USER_AGENT}}
 
