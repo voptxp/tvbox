@@ -7,8 +7,9 @@
 #   详情     /archives/{id}/
 #   搜索     /search/{kw}/            分页 /search/{kw}/{N}/
 #
-# 播放地址：详情页 <div class="dplayer" data-config='{...}'>
-#   data-config 里的 video.url / video_h265.url 是带签名的 m3u8，需实时抓取
+# 播放地址：详情页 data-config 里的 m3u8 是带签名、有时效的，需实时抓取。
+# 注意：本站封面图是 AES 加密的（站点 JS 用 CryptoJS 解密后显示），
+#       TVBox 无法直接显示，故 vod_pic 置空。
 import json
 import sys
 import requests
@@ -135,56 +136,24 @@ class Spider(Spider):
         if not vod_name:
             vod_name = data('title').text().strip()
 
-        pic = ''
-        i = raw.find('data-xkrkllgl="')
-        if i >= 0:
-            i += len('data-xkrkllgl="')
-            j = raw.find('"', i)
-            if j >= 0:
-                pic = raw[i:j]
-        if not pic:
-            pic = data('meta[property="og:image"]').attr('content') or ''
-        if pic.startswith('//'):
-            pic = 'https:' + pic
-
         desc = data('meta[property="og:description"]').attr('content') or ''
         rel = data('meta[itemprop="dateModified"]').attr('content') or ''
         if rel:
             rel = rel[:10]
 
+        urls = self._extract_m3u8(raw)
         lines = []
         seen = set()
-        total_cfg = raw.count("data-config='")
-        vid_no = 0
-        pos = 0
-        while True:
-            i = raw.find("data-config='", pos)
-            if i < 0:
-                break
-            i += len("data-config='")
-            j = raw.find("'", i)
-            if j < 0:
-                break
-            cfg = unescape(raw[i:j])
-            pos = j + 1
-            try:
-                obj = json.loads(cfg)
-            except Exception:
+        counts = {}
+        for u in urls:
+            if u in seen:
                 continue
-            vid_no += 1
-            prefix = f'视频{vid_no}' if total_cfg > 1 else ''
-            items = []
-            v = obj.get('video') or {}
-            if v.get('url'):
-                items.append(('高清', v.get('url')))
-            hv = obj.get('video_h265') or {}
-            if hv.get('url'):
-                items.append(('H265', hv.get('url')))
-            for label, u in items:
-                if not u or u in seen:
-                    continue
-                seen.add(u)
-                lines.append(prefix + label + chr(36) + u)
+            seen.add(u)
+            base = 'H265' if '/m3m/' in u else '高清'
+            n = counts.get(base, 0) + 1
+            counts[base] = n
+            label = base if n == 1 else base + str(n)
+            lines.append(label + chr(36) + u)
 
         play_from = ''
         play_url = ''
@@ -194,7 +163,7 @@ class Spider(Spider):
 
         vod = {
             'vod_name': vod_name,
-            'vod_pic': pic,
+            'vod_pic': '',
             'vod_content': desc or vod_name,
             'vod_remarks': rel,
             'vod_play_from': play_from,
@@ -225,6 +194,31 @@ class Spider(Spider):
         pass
 
     # ------------------------------------------------------------------ 解析工具
+    def _extract_m3u8(self, raw):
+        urls = []
+        seen = set()
+        pos = 0
+        bs = chr(92)
+        while True:
+            i = raw.find('.m3u8', pos)
+            if i < 0:
+                break
+            start = raw.rfind('https', 0, i)
+            if start < 0:
+                start = i - 200
+                if start < 0:
+                    start = 0
+            end = raw.find('"', i + 5)
+            if end < 0:
+                end = i + 220
+            u = raw[start:end]
+            u = u.replace(bs + '/', '/').strip()
+            if 'm3u8' in u and u.startswith('http') and u not in seen:
+                seen.add(u)
+                urls.append(u)
+            pos = i + 5
+        return urls
+
     def getlist(self, html):
         videos = []
         seen = set()
@@ -256,16 +250,6 @@ class Spider(Spider):
             if not title:
                 continue
 
-            pic = ''
-            i = block.find("loadBannerDirect('")
-            if i >= 0:
-                i += len("loadBannerDirect('")
-                j = block.find("'", i)
-                if j >= 0:
-                    pic = block[i:j]
-            if pic.startswith('//'):
-                pic = 'https:' + pic
-
             date = ''
             i = block.find('itemprop="datePublished"')
             if i >= 0:
@@ -280,7 +264,7 @@ class Spider(Spider):
             videos.append({
                 'vod_id': href,
                 'vod_name': title,
-                'vod_pic': pic,
+                'vod_pic': '',
                 'vod_remarks': date,
             })
         return videos
