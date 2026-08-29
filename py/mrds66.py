@@ -8,14 +8,12 @@
 #   搜索     /search/{kw}/            分页 /search/{kw}/{N}/
 #
 # 播放地址：详情页 data-config 里的 m3u8 是带签名、有时效的，需实时抓取。
-# 注意：本站封面图是 AES 加密的（站点 JS 用 CryptoJS 解密后显示），
-#       TVBox 无法直接显示，故 vod_pic 置空。
-import json
+# 注意：本站封面图是 AES 加密的，TVBox 无法直接显示，故 vod_pic 置空。
+# 全部用字符串解析，不依赖 lxml/pyquery，避免 TVBox 内置环境编码误判报错。
 import sys
 import requests
 from html import unescape
 from urllib.parse import quote
-from pyquery import PyQuery as pq
 
 sys.path.append('..')
 from base.spider import Spider
@@ -82,17 +80,9 @@ class Spider(Spider):
         r.encoding = 'utf-8'
         return r.text
 
-    def getpq(self, path='', referer=None):
-        data = self._get(path, referer)
-        try:
-            return pq(data)
-        except Exception:
-            return pq(data.encode('utf-8'))
-
     # ------------------------------------------------------------------ TVBox 接口
     def homeContent(self, filter):
         raw = self._get('/')
-        data = pq(raw)
         classes = [{'type_name': name, 'type_id': '/category/' + slug + '/'} for slug, name in self.CATEGORIES]
         return {'class': classes, 'list': self.getlist(raw)}
 
@@ -123,16 +113,19 @@ class Spider(Spider):
         return f'{tid}{pg}/'
 
     def detailContent(self, ids):
-        raw = self._get(ids[0])
-        data = pq(raw)
-        vod_name = data('meta[property="og:title"]').attr('content') or ''
-        if not vod_name:
-            vod_name = data('meta[itemprop="headline"]').attr('content') or ''
-        if not vod_name:
-            vod_name = data('title').text().strip()
+        vid = ids[0] if ids else ''
+        raw = self._get(vid)
 
-        desc = data('meta[property="og:description"]').attr('content') or ''
-        rel = data('meta[itemprop="dateModified"]').attr('content') or ''
+        vod_name = self._meta_content(raw, 'property="og:title"') or self._meta_content(raw, 'itemprop="headline"') or ''
+        if not vod_name:
+            i = raw.find('<title>')
+            if i >= 0:
+                j = raw.find('</title>', i)
+                if j >= 0:
+                    vod_name = unescape(raw[i + 7:j]).strip()
+
+        desc = self._meta_content(raw, 'property="og:description"') or vod_name
+        rel = self._meta_content(raw, 'itemprop="dateModified"') or ''
         if rel:
             rel = rel[:10]
 
@@ -157,6 +150,7 @@ class Spider(Spider):
             play_url = '#'.join(lines)
 
         vod = {
+            'vod_id': vid,
             'vod_name': vod_name,
             'vod_pic': '',
             'vod_content': desc or vod_name,
@@ -189,6 +183,19 @@ class Spider(Spider):
         pass
 
     # ------------------------------------------------------------------ 解析工具
+    def _meta_content(self, raw, key):
+        i = raw.find(key)
+        if i < 0:
+            return ''
+        i = raw.find('content="', i)
+        if i < 0:
+            return ''
+        i += len('content="')
+        j = raw.find('"', i)
+        if j < 0:
+            return ''
+        return unescape(raw[i:j]).strip()
+
     def _extract_m3u8(self, raw):
         urls = []
         seen = set()
