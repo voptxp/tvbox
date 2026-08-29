@@ -273,6 +273,18 @@
    }
   },
   {
+   "key": "py_cg91",
+   "name": "91吃瓜[py]",
+   "type": 3,
+   "api": "./py/cg91.py",
+   "quickSearch": 1,
+   "searchable": 1,
+   "filterable": 0,
+   "ext": {
+    "img_proxy": "http://192.168.0.3/cg91_img.php"
+   }
+  },
+  {
    "key": "py_蛋挞",
    "name": "蛋挞影视[py]",
    "type": 3,
