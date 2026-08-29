@@ -59,7 +59,8 @@ class Spider(Spider):
     ]
 
     def init(self, extend=''):
-        pass
+        self._session = requests.Session()
+        self._session.headers.update(self.headers)
 
     def getName(self):
         pass
@@ -76,14 +77,8 @@ class Spider(Spider):
     # ------------------------------------------------------------------ 网络层
     def _get(self, path, referer=None):
         url = path if path.startswith('http') else f'{self.host}{path}'
-        h = dict(self.headers)
-        if referer:
-            h['referer'] = referer
-        try:
-            return self.fetch(url, headers=h).text
-        except Exception:
-            pass
-        r = requests.get(url, headers=h, timeout=15)
+        h = {'referer': referer} if referer else {}
+        r = self._session.get(url, headers=h, timeout=15)
         r.encoding = r.apparent_encoding or 'utf-8'
         return r.text
 
@@ -161,18 +156,10 @@ class Spider(Spider):
             play_from = '在线'
             play_url = '#'.join(lines)
 
-        dbg = []
-        dbg.append('raw=' + str(len(raw)))
-        dbg.append('cfg=' + str(chr(100)+chr(97)+chr(116)+chr(97)+chr(45)+chr(99)+chr(111)+chr(110)+chr(102)+chr(105)+chr(103)+chr(61)+chr(39) in raw))
-        dbg.append('m3u8dot=' + str(raw.count('.m3u8')))
-        dbg.append('urls=' + str(len(urls)))
-        dbg.append('lines=' + str(len(lines)))
-        content = 'DEBUG[' + ' | '.join(dbg) + '] ' + (desc or vod_name)
-
         vod = {
             'vod_name': vod_name,
             'vod_pic': '',
-            'vod_content': content,
+            'vod_content': desc or vod_name,
             'vod_remarks': rel,
             'vod_play_from': play_from,
             'vod_play_url': play_url,
