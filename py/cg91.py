@@ -39,7 +39,9 @@ class Spider(Spider):
     CATEGORIES = [
         ('zxcghl', '今日吃瓜'),
         ('sports-live', '体育直播'),
-        ('sstp', '实时偷拍'),
+        ('sstp', '偷拍·热门'),
+        ('sstp/live', '偷拍·监控'),
+        ('sstp/replay', '偷拍·回放'),
         ('rsdg', '最高点击'),
         ('zdtop', '91周榜'),
         ('ydtop', '91月榜'),
@@ -215,6 +217,77 @@ class Spider(Spider):
             return self.img_proxy + '?url=' + quote(url, safe='')
         return url
 
+    def _getlist_realtime(self, html):
+        videos = []
+        seen = set()
+        pos = 0
+        while True:
+            i = html.find('realtime-card', pos)
+            if i < 0:
+                break
+            start = html.rfind('<a ', 0, i)
+            if start < 0:
+                start = i - 200
+            end = html.find('</a>', i)
+            if end < 0:
+                end = i + 500
+            block = html[start:end]
+            pos = end + 1
+
+            href = ''
+            j = block.find('href="')
+            if j >= 0:
+                j += 6
+                k = block.find('"', j)
+                if k >= 0:
+                    href = block[j:k]
+            if not href or href in seen:
+                continue
+            seen.add(href)
+
+            title = ''
+            j = block.find('aria-label="')
+            if j >= 0:
+                j += len('aria-label="')
+                k = block.find('"', j)
+                if k >= 0:
+                    title = unescape(block[j:k]).strip()
+            if not title:
+                j = block.find('alt="')
+                if j >= 0:
+                    j += 5
+                    k = block.find('"', j)
+                    if k >= 0:
+                        title = unescape(block[j:k]).strip()
+            if not title:
+                continue
+
+            pic = ''
+            j = block.find('data-xkrkllgl="')
+            if j >= 0:
+                j += len('data-xkrkllgl="')
+                k = block.find('"', j)
+                if k >= 0:
+                    pic = block[j:k]
+            pic = self._pic(pic)
+
+            remarks = ''
+            j = block.find('realtime-card__status')
+            if j >= 0:
+                j = block.find('>', j)
+                if j >= 0:
+                    k = block.find('<', j + 1)
+                    if k >= 0:
+                        remarks = block[j + 1:k].strip()
+
+            videos.append({
+                'vod_id': href,
+                'vod_name': title,
+                'vod_pic': pic,
+                'vod_remarks': remarks,
+            })
+        return videos
+
     def _meta_content(self, raw, key):
         i = raw.find(key)
         if i < 0:
@@ -254,6 +327,8 @@ class Spider(Spider):
         return urls
 
     def getlist(self, html):
+        if 'realtime-card' in html:
+            return self._getlist_realtime(html)
         videos = []
         seen = set()
         parts = html.split('<article ')
