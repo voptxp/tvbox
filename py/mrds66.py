@@ -79,7 +79,7 @@ class Spider(Spider):
         url = path if path.startswith('http') else f'{self.host}{path}'
         h = {'referer': referer} if referer else {}
         r = self._session.get(url, headers=h, timeout=15)
-        r.encoding = r.apparent_encoding or 'utf-8'
+        r.encoding = 'utf-8'
         return r.text
 
     def getpq(self, path='', referer=None):
@@ -123,59 +123,48 @@ class Spider(Spider):
         return f'{tid}{pg}/'
 
     def detailContent(self, ids):
-        vid = ids[0] if ids else 'NOIDS'
-        try:
-            raw = self._get(vid)
-            data = pq(raw)
-            vod_name = data('meta[property="og:title"]').attr('content') or ''
-            if not vod_name:
-                vod_name = data('meta[itemprop="headline"]').attr('content') or ''
-            if not vod_name:
-                vod_name = data('title').text().strip()
+        raw = self._get(ids[0])
+        data = pq(raw)
+        vod_name = data('meta[property="og:title"]').attr('content') or ''
+        if not vod_name:
+            vod_name = data('meta[itemprop="headline"]').attr('content') or ''
+        if not vod_name:
+            vod_name = data('title').text().strip()
 
-            desc = data('meta[property="og:description"]').attr('content') or ''
-            rel = data('meta[itemprop="dateModified"]').attr('content') or ''
-            if rel:
-                rel = rel[:10]
+        desc = data('meta[property="og:description"]').attr('content') or ''
+        rel = data('meta[itemprop="dateModified"]').attr('content') or ''
+        if rel:
+            rel = rel[:10]
 
-            urls = self._extract_m3u8(raw)
-            lines = []
-            seen = set()
-            counts = {}
-            for u in urls:
-                if u in seen:
-                    continue
-                seen.add(u)
-                base = 'H265' if '/m3m/' in u else '高清'
-                n = counts.get(base, 0) + 1
-                counts[base] = n
-                label = base if n == 1 else base + str(n)
-                lines.append(label + chr(36) + u)
+        urls = self._extract_m3u8(raw)
+        lines = []
+        seen = set()
+        counts = {}
+        for u in urls:
+            if u in seen:
+                continue
+            seen.add(u)
+            base = 'H265' if '/m3m/' in u else '高清'
+            n = counts.get(base, 0) + 1
+            counts[base] = n
+            label = base if n == 1 else base + str(n)
+            lines.append(label + chr(36) + u)
 
-            play_from = ''
-            play_url = ''
-            if lines:
-                play_from = '在线'
-                play_url = '#'.join(lines)
+        play_from = ''
+        play_url = ''
+        if lines:
+            play_from = '在线'
+            play_url = '#'.join(lines)
 
-            vod = {
-                'vod_name': vod_name,
-                'vod_pic': '',
-                'vod_content': desc or vod_name,
-                'vod_remarks': rel,
-                'vod_play_from': play_from,
-                'vod_play_url': play_url,
-            }
-            return {'list': [vod]}
-        except Exception as e:
-            return {'list': [{
-                'vod_name': 'ERR:' + str(vid),
-                'vod_pic': '',
-                'vod_content': 'EXC:' + repr(e),
-                'vod_remarks': '',
-                'vod_play_from': '',
-                'vod_play_url': '',
-            }]}
+        vod = {
+            'vod_name': vod_name,
+            'vod_pic': '',
+            'vod_content': desc or vod_name,
+            'vod_remarks': rel,
+            'vod_play_from': play_from,
+            'vod_play_url': play_url,
+        }
+        return {'list': [vod]}
 
     def searchContent(self, key, quick, pg='1'):
         pg = int(pg or 1)
