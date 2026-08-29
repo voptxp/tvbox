@@ -285,6 +285,18 @@
    }
   },
   {
+   "key": "py_cg51",
+   "name": "51吃瓜[py]",
+   "type": 3,
+   "api": "./py/cg51.py",
+   "quickSearch": 1,
+   "searchable": 1,
+   "filterable": 0,
+   "ext": {
+    "img_proxy": "http://192.168.0.3/mrds66_img.php"
+   }
+  },
+  {
    "key": "py_蛋挞",
    "name": "蛋挞影视[py]",
    "type": 3,
