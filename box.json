@@ -261,13 +261,16 @@
   "filterable": 0
   },
   {
-  "key": "py_mrds66",
-  "name": "每日大赛[py]",
-  "type": 3,
-  "api": "./py/mrds66.py",
-  "quickSearch": 1,
-  "searchable": 1,
-  "filterable": 0
+   "key": "py_mrds66",
+   "name": "每日大赛[py]",
+   "type": 3,
+   "api": "./py/mrds66.py",
+   "quickSearch": 1,
+   "searchable": 1,
+   "filterable": 0,
+   "ext": {
+    "img_proxy": "http://192.168.0.3/mrds66_img.php"
+   }
   },
   {
    "key": "py_蛋挞",
