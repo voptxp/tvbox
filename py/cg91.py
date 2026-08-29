@@ -158,15 +158,36 @@ class Spider(Spider):
         lines = []
         seen = set()
         counts = {}
-        for u in urls:
-            if u in seen:
-                continue
-            seen.add(u)
-            base = 'H265' if '/m3m/' in u else '高清'
-            n = counts.get(base, 0) + 1
-            counts[base] = n
-            label = base if n == 1 else base + str(n)
-            lines.append(label + chr(36) + u)
+        if urls:
+            for u in urls:
+                if u in seen:
+                    continue
+                seen.add(u)
+                base = 'H265' if '/m3m/' in u else '高清'
+                n = counts.get(base, 0) + 1
+                counts[base] = n
+                label = base if n == 1 else base + str(n)
+                lines.append(label + chr(36) + u)
+        else:
+            # 榜单/合集：详情页没有直接 m3u8，而是指向多个真实视频
+            for title, href in self._extract_ranking(raw)[:20]:
+                try:
+                    sub = self._get(href)
+                except Exception:
+                    continue
+                sub_urls = self._extract_m3u8(sub)
+                if not sub_urls:
+                    continue
+                u = sub_urls[0]
+                if u in seen:
+                    continue
+                seen.add(u)
+                label = title or '视频'
+                n = counts.get(label, 0) + 1
+                counts[label] = n
+                if n > 1:
+                    label = label + str(n)
+                lines.append(label + chr(36) + u)
 
         play_from = ''
         play_url = ''
@@ -300,6 +321,46 @@ class Spider(Spider):
         if j < 0:
             return ''
         return unescape(raw[i:j]).strip()
+
+    def _extract_ranking(self, raw):
+        entries = []
+        seen = set()
+        pos = 0
+        while True:
+            i = raw.find('btn btn-primary', pos)
+            if i < 0:
+                break
+            start = raw.rfind('<a ', 0, i)
+            if start < 0:
+                pos = i + 10
+                continue
+            end = raw.find('</a>', i)
+            if end < 0:
+                pos = i + 10
+                continue
+            block = raw[start:end]
+            pos = end + 4
+
+            href = ''
+            j = block.find('href="')
+            if j >= 0:
+                j += 6
+                k = block.find('"', j)
+                if k >= 0:
+                    href = block[j:k]
+            if not href or '/archives/' not in href or href in seen:
+                continue
+            seen.add(href)
+
+            title = ''
+            j = block.find('>')
+            if j >= 0:
+                title = unescape(block[j + 1:]).strip()
+            title = title.split('|')[0].replace('点击查看详情', '').strip()
+            if not title:
+                title = '视频'
+            entries.append((title, href))
+        return entries
 
     def _extract_m3u8(self, raw):
         urls = []
