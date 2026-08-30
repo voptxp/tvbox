@@ -7,10 +7,16 @@
 #   详情     /archives/{id}/
 #   搜索     /search/{kw}/            分页 /search/{kw}/{N}/
 #
-# 播放地址：详情页 data-config 里的 m3u8 是带签名、有时效的，需实时抓取。
-# 注意：本站封面图是 AES 加密的，TVBox 无法直接显示，故 vod_pic 置空。
-# 全部用字符串解析，不依赖 lxml/pyquery，避免 TVBox 内置环境编码误判报错。
+# 播放地址：详情页每个 .dplayer 的 data-config（JSON）里含：
+#   video      -> 高清 m3u8（/videos5/...）
+#   video_h265 -> H265 m3u8（/m3m/...，可能为空）
+# 一个页面可能出现多个 .dplayer：
+#   * 普通影片：1 个窗口（高清 + H265）
+#   * 一页多集：N 个窗口，标题带“X-Y集 / 第X集 / 合集” -> 每个窗口一集
+#   * 多线路：  N 个窗口，标题无集数 -> 每条线路一个窗口
+# 全部用字符串解析 + 内置 json，不依赖 lxml/pyquery，避免 TVBox 内置环境编码误判报错。
 import json
+import re
 import sys
 import requests
 from html import unescape
@@ -103,12 +109,14 @@ class Spider(Spider):
     def categoryContent(self, tid, pg, filter, extend):
         pg = int(pg or 1)
         raw = self._get(self._page_path(tid, pg))
+        lst = self.getlist(raw)
+        pc = self._pagecount(raw)
         return {
-            'list': self.getlist(raw),
+            'list': lst,
             'page': pg,
-            'pagecount': 9999,
-            'limit': 90,
-            'total': 999999,
+            'pagecount': pc,
+            'limit': len(lst),
+            'total': pc * len(lst) if lst else 0,
         }
 
     def _page_path(self, tid, pg):
@@ -122,6 +130,17 @@ class Spider(Spider):
         if not tid.endswith('/'):
             tid = tid + '/'
         return f'{tid}{pg}/'
+
+    def _pagecount(self, raw):
+        i = raw.find('page-info')
+        if i >= 0:
+            j = raw.find('/', i)
+            k = raw.find('<', j)
+            if j >= 0 and k >= 0:
+                n = raw[j + 1:k].strip()
+                if n.isdigit() and int(n) > 0:
+                    return int(n)
+        return 9999
 
     def detailContent(self, ids):
         vid = ids[0] if ids else ''
@@ -149,25 +168,22 @@ class Spider(Spider):
                 pic = raw[i:j]
         pic = self._pic(pic)
 
-        urls = self._extract_m3u8(raw)
-        lines = []
-        seen = set()
-        counts = {}
-        for u in urls:
-            if u in seen:
-                continue
-            seen.add(u)
-            base = 'H265' if '/m3m/' in u else '高清'
-            n = counts.get(base, 0) + 1
-            counts[base] = n
-            label = base if n == 1 else base + str(n)
-            lines.append(label + chr(36) + u)
+        wins = self._parse_windows(raw)
+        line_names, line_urls = self._build_play_lines(raw, wins)
 
-        play_from = ''
-        play_url = ''
-        if lines:
-            play_from = '在线'
-            play_url = '#'.join(lines)
+        if not line_urls:
+            urls = self._extract_m3u8(raw)
+            if urls:
+                counts = {}
+                eps = []
+                for u in urls:
+                    base = 'H265' if '/m3m/' in u else '高清'
+                    n = counts.get(base, 0) + 1
+                    counts[base] = n
+                    label = base if n == 1 else base + str(n)
+                    eps.append(label + chr(36) + u)
+                line_names = ['在线']
+                line_urls = ['#'.join(eps)]
 
         vod = {
             'vod_id': vid,
@@ -175,8 +191,8 @@ class Spider(Spider):
             'vod_pic': pic,
             'vod_content': desc or vod_name,
             'vod_remarks': rel,
-            'vod_play_from': play_from,
-            'vod_play_url': play_url,
+            'vod_play_from': '$$$'.join(line_names) if line_names else '',
+            'vod_play_url': '$$$'.join(line_urls) if line_urls else '',
         }
         return {'list': [vod]}
 
@@ -203,6 +219,115 @@ class Spider(Spider):
         pass
 
     # ------------------------------------------------------------------ 解析工具
+    def _parse_windows(self, raw):
+        wins = []
+        pos = 0
+        while True:
+            i = raw.find("data-config='", pos)
+            if i < 0:
+                break
+            j = raw.find("'", i + len("data-config='"))
+            if j < 0:
+                break
+            cfg = raw[i + len("data-config='"):j]
+            pos = j + 1
+
+            v = ''
+            h = ''
+            try:
+                obj = json.loads(cfg.replace('\\/', '/'))
+            except Exception:
+                v = self._json_url(cfg, 'video')
+                h = self._json_url(cfg, 'video_h265')
+            else:
+                vo = obj.get('video')
+                ho = obj.get('video_h265')
+                if isinstance(vo, dict):
+                    v = vo.get('url') or ''
+                if isinstance(ho, dict):
+                    h = ho.get('url') or ''
+
+            if not v and not h:
+                continue
+
+            tt = ''
+            ti = raw.rfind('data-video_title="', 0, i)
+            if ti >= 0:
+                tj = raw.find('"', ti + len('data-video_title="'))
+                if tj >= 0 and tj < i:
+                    tt = raw[ti + len('data-video_title="'):tj]
+
+            wins.append({'title': tt, 'video': v, 'h265': h})
+        return wins
+
+    def _json_url(self, cfg, key):
+        m = re.search(r'"' + re.escape(key) + r'"\s*:\s*\{\s*"url"\s*:\s*"([^"]*)"', cfg)
+        if m:
+            return m.group(1).replace('\\/', '/')
+        return ''
+
+    def _build_play_lines(self, raw, wins):
+        names = []
+        urls = []
+        if not wins:
+            return names, urls
+
+        if len(wins) == 1:
+            w = wins[0]
+            eps = []
+            if w['video']:
+                eps.append('高清' + chr(36) + w['video'])
+            if w['h265']:
+                eps.append('H265' + chr(36) + w['h265'])
+            if eps:
+                names = ['在线']
+                urls = ['#'.join(eps)]
+            return names, urls
+
+        # 多个窗口
+        if self._is_episode_page(raw):
+            labels = self._episode_labels(raw, len(wins))
+            hd = []
+            hv = []
+            for i, w in enumerate(wins):
+                lb = labels[i] if i < len(labels) else ('第%d集' % (i + 1))
+                if w['video']:
+                    hd.append(lb + chr(36) + w['video'])
+                if w['h265']:
+                    hv.append(lb + chr(36) + w['h265'])
+            if hd:
+                names.append('高清')
+                urls.append('#'.join(hd))
+            if hv:
+                names.append('H265')
+                urls.append('#'.join(hv))
+        else:
+            for i, w in enumerate(wins):
+                eps = []
+                if w['video']:
+                    eps.append('高清' + chr(36) + w['video'])
+                if w['h265']:
+                    eps.append('H265' + chr(36) + w['h265'])
+                if eps:
+                    names.append('线路%d' % (i + 1))
+                    urls.append('#'.join(eps))
+        return names, urls
+
+    def _is_episode_page(self, raw):
+        title = self._meta_content(raw, 'property="og:title"') or ''
+        return ('集' in title) or ('合集' in title)
+
+    def _episode_labels(self, raw, n):
+        title = self._meta_content(raw, 'property="og:title"') or ''
+        m = re.search(r'(\d+)\s*[-—~～至到]\s*(\d+)\s*集', title)
+        if m:
+            a = int(m.group(1))
+            b = int(m.group(2))
+            if b - a + 1 == n:
+                return ['第%d集' % x for x in range(a, b + 1)]
+            return ['第%d集' % x for x in range(a, a + n)]
+        return ['第%d集' % (i + 1) for i in range(n)]
+
     def _pic(self, url):
         if not url:
             return ''
@@ -273,9 +398,7 @@ class Spider(Spider):
             i = block.find('itemprop="headline">')
             if i >= 0:
                 i += len('itemprop="headline">')
-                j = block.find('<div', i)
-                if j < 0:
-                    j = block.find('</h2>', i)
+                j = block.find('</h2>', i)
                 if j >= 0:
                     title = unescape(block[i:j]).strip()
             if not title:
