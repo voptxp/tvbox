@@ -162,42 +162,50 @@ class Spider(Spider):
         lines = []
         seen = set()
         counts = {}
-        series = self._collect_series(raw)
-        if len(series) > 1:
-            for label, u in series:
+        multi = self._extract_multi_episodes(raw) if raw.count("data-config='") > 1 else []
+        if multi:
+            for label, u in multi:
                 if u in seen:
                     continue
                 seen.add(u)
-                lines.append(label + chr(36) + u)
-        elif urls:
-            for u in urls:
-                if u in seen:
-                    continue
-                seen.add(u)
-                base = 'H265' if '/m3m/' in u else '高清'
-                n = counts.get(base, 0) + 1
-                counts[base] = n
-                label = base if n == 1 else base + str(n)
                 lines.append(label + chr(36) + u)
         else:
-            for title, href in self._extract_ranking(raw)[:20]:
-                try:
-                    sub = self._get(href)
-                except Exception:
-                    continue
-                sub_urls = self._extract_m3u8(sub)
-                if not sub_urls:
-                    continue
-                u = sub_urls[0]
-                if u in seen:
-                    continue
-                seen.add(u)
-                label = title or '视频'
-                n = counts.get(label, 0) + 1
-                counts[label] = n
-                if n > 1:
-                    label = label + str(n)
-                lines.append(label + chr(36) + u)
+            series = self._collect_series(raw)
+            if len(series) > 1:
+                for label, u in series:
+                    if u in seen:
+                        continue
+                    seen.add(u)
+                    lines.append(label + chr(36) + u)
+            elif urls:
+                for u in urls:
+                    if u in seen:
+                        continue
+                    seen.add(u)
+                    base = 'H265' if '/m3m/' in u else '高清'
+                    n = counts.get(base, 0) + 1
+                    counts[base] = n
+                    label = base if n == 1 else base + str(n)
+                    lines.append(label + chr(36) + u)
+            else:
+                for title, href in self._extract_ranking(raw)[:20]:
+                    try:
+                        sub = self._get(href)
+                    except Exception:
+                        continue
+                    sub_urls = self._extract_m3u8(sub)
+                    if not sub_urls:
+                        continue
+                    u = sub_urls[0]
+                    if u in seen:
+                        continue
+                    seen.add(u)
+                    label = title or '视频'
+                    n = counts.get(label, 0) + 1
+                    counts[label] = n
+                    if n > 1:
+                        label = label + str(n)
+                    lines.append(label + chr(36) + u)
 
         play_from = ''
         play_url = ''
@@ -345,6 +353,48 @@ class Spider(Spider):
             if j >= 0:
                 return title[i:j + 1]
         return title
+
+    def _label_from_title_attr(self, tt):
+        s = tt.strip()
+        if len(s) >= 3 and s[-3:].isdigit():
+            return '第' + str(int(s[-3:])) + '集'
+        return ''
+
+    def _extract_multi_episodes(self, raw):
+        # 一页多集：多个 data-config，每个播放窗口一集（data-video_title 末尾 001/002/003）
+        episodes = []
+        pos = 0
+        n = 0
+        while True:
+            i = raw.find("data-config='", pos)
+            if i < 0:
+                break
+            j = raw.find("'", i + len("data-config='"))
+            if j < 0:
+                break
+            cfg = raw[i + len("data-config='"):j]
+            pos = j + 1
+            u = ''
+            mi = cfg.find('.m3u8')
+            if mi >= 0:
+                s2 = cfg.rfind('https', 0, mi)
+                e2 = cfg.find('"', mi)
+                if s2 >= 0 and e2 >= 0:
+                    u = cfg[s2:e2].replace(chr(92) + '/', '/').strip()
+            if not u:
+                continue
+            n += 1
+            label = ''
+            ti = raw.rfind('data-video_title="', 0, i)
+            if ti >= 0:
+                tj = raw.find('"', ti + len('data-video_title="'))
+                if tj >= 0:
+                    tt = raw[ti + len('data-video_title="'):tj]
+                    label = self._label_from_title_attr(tt)
+            if not label:
+                label = '第' + str(n) + '集'
+            episodes.append((label, u))
+        return episodes
 
     def _collect_series(self, raw):
         # 短剧：一集一页，当前页 + 链式“点击观看”指向的其它集，返回正序 [(label, m3u8)]
