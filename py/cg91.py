@@ -108,13 +108,33 @@ class Spider(Spider):
     def categoryContent(self, tid, pg, filter, extend):
         pg = int(pg or 1)
         raw = self._get(self._page_path(tid, pg))
+        lst = self.getlist(raw)
+        pages = self._pagecount(raw)
         return {
-            'list': self.getlist(raw),
+            'list': lst,
             'page': pg,
-            'pagecount': 9999,
-            'limit': 90,
-            'total': 999999,
+            'pagecount': pages,
+            'limit': len(lst),
+            'total': pages * len(lst) if lst else 0,
         }
+
+    def _pagecount(self, raw):
+        i = raw.find('page-info')
+        if i >= 0:
+            j = raw.find('</span>', i)
+            if j >= 0:
+                s = raw[i:j]
+                slash = s.rfind('/')
+                if slash >= 0:
+                    num = ''
+                    for ch in s[slash + 1:]:
+                        if ch.isdigit():
+                            num += ch
+                        elif num:
+                            break
+                    if num:
+                        return int(num)
+        return 1
 
     def _page_path(self, tid, pg):
         tid = (tid or '').strip()
