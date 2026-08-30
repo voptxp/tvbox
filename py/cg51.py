@@ -162,7 +162,14 @@ class Spider(Spider):
         lines = []
         seen = set()
         counts = {}
-        if urls:
+        series = self._collect_series(raw)
+        if len(series) > 1:
+            for label, u in series:
+                if u in seen:
+                    continue
+                seen.add(u)
+                lines.append(label + chr(36) + u)
+        elif urls:
             for u in urls:
                 if u in seen:
                     continue
@@ -324,6 +331,52 @@ class Spider(Spider):
         if j < 0:
             return ''
         return unescape(raw[i:j]).strip()
+
+    def _series_key(self, title):
+        i = title.find('第')
+        if i >= 0 and title.find('集', i) > i:
+            return title[:i].strip()
+        return ''
+
+    def _episode_label(self, title):
+        i = title.find('第')
+        if i >= 0:
+            j = title.find('集', i)
+            if j >= 0:
+                return title[i:j + 1]
+        return title
+
+    def _collect_series(self, raw):
+        # 短剧：一集一页，当前页 + 链式“点击观看”指向的其它集，返回正序 [(label, m3u8)]
+        cur_title = self._meta_content(raw, 'property="og:title"') or ''
+        cur_key = self._series_key(cur_title)
+        if not cur_key:
+            urls = self._extract_m3u8(raw)
+            return [(self._episode_label(cur_title) or cur_title, urls[0])] if urls else []
+
+        episodes = []
+        seen = set()
+        cur = raw
+        for _ in range(30):
+            urls = self._extract_m3u8(cur)
+            t = self._meta_content(cur, 'property="og:title"') or ''
+            label = self._episode_label(t) or t
+            if urls:
+                episodes.append((label, urls[0]))
+            nxt = ''
+            for lt, h in self._extract_ranking(cur):
+                if h and '/archives/' in h and h not in seen and self._series_key(lt) == cur_key:
+                    seen.add(h)
+                    nxt = h
+                    break
+            if not nxt:
+                break
+            try:
+                cur = self._get(nxt)
+            except Exception:
+                break
+        episodes.reverse()
+        return episodes
 
     def _extract_ranking(self, raw):
         entries = []
