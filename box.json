@@ -342,6 +342,51 @@
    "changeable": 0
   },
   {
+   "key": "py_aiseqingduanju",
+   "name": "AI色情短剧[py]",
+   "type": 3,
+   "api": "./py/aiseqingduanju.py",
+   "searchable": 1,
+   "quickSearch": 1,
+   "changeable": 0
+  },
+  {
+   "key": "py_mitaochuanmei",
+   "name": "蜜桃传媒[py]",
+   "type": 3,
+   "api": "./py/mitaochuanmei.py",
+   "searchable": 1,
+   "quickSearch": 1,
+   "changeable": 0
+  },
+  {
+   "key": "py_madouzuoai",
+   "name": "麻豆做爱[py]",
+   "type": 3,
+   "api": "./py/madouzuoai.py",
+   "searchable": 1,
+   "quickSearch": 1,
+   "changeable": 0
+  },
+  {
+   "key": "py_jingdongyingye",
+   "name": "精东影业[py]",
+   "type": 3,
+   "api": "./py/jingdongyingye.py",
+   "searchable": 1,
+   "quickSearch": 1,
+   "changeable": 0
+  },
+  {
+   "key": "py_douyin",
+   "name": "成人抖音[py]",
+   "type": 3,
+   "api": "./py/douyin.py",
+   "searchable": 1,
+   "quickSearch": 1,
+   "changeable": 0
+  },
+  {
    "key": "py_蛋挞",
    "name": "蛋挞影视[py]",
    "type": 3,
