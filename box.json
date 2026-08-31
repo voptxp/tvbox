@@ -297,6 +297,15 @@
    }
   },
   {
+   "key": "py_91porna",
+   "name": "91PORN[py]",
+   "type": 3,
+   "api": "./py/91porna.py",
+   "searchable": 1,
+   "quickSearch": 1,
+   "changeable": 0
+  },
+  {
    "key": "py_蛋挞",
    "name": "蛋挞影视[py]",
    "type": 3,
