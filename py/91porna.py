@@ -72,7 +72,6 @@ class Spider(Spider):
         ('短视频·反差系列', '/melonshort/fancha'),
         ('短视频·网红达人', '/melonshort/wanghong'),
         ('短视频·明星大瓜', '/melonshort/mingxing'),
-        ('短视频·AI短视频', '/melonshort/ai'),
         # 黑料吃瓜
         ('黑料吃瓜·推荐', _hei('黑料吃瓜/推荐')),
         ('黑料吃瓜·最新', _hei('黑料吃瓜/最新')),
