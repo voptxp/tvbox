@@ -315,6 +315,15 @@
    "changeable": 0
   },
   {
+   "key": "py_mdbdy",
+   "name": "麻豆不打烊[py]",
+   "type": 3,
+   "api": "./py/mdbdy.py",
+   "searchable": 1,
+   "quickSearch": 1,
+   "changeable": 0
+  },
+  {
    "key": "py_sanji",
    "name": "三级片[py]",
    "type": 3,
