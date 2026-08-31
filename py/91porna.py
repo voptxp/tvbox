@@ -495,11 +495,34 @@ class Spider(Spider):
         name = self._meta_content(raw, 'property="og:title"') or self._title(raw)
         desc = self._meta_content(raw, 'property="og:description"') or name
         pic = self._meta_content(raw, 'property="og:image"')
+
         episodes = []
-        for it in self._getlist(raw):
-            if not it.get('vod_name'):
-                continue
-            episodes.append(it['vod_name'] + chr(36) + it['vod_id'])
+        seen = set()
+
+        def collect(page_raw):
+            added = 0
+            for it in self._getlist(page_raw):
+                uid = it.get('vod_id')
+                if not uid or uid in seen:
+                    continue
+                seen.add(uid)
+                episodes.append((it.get('vod_name') or '视频') + chr(36) + uid)
+                added += 1
+            return added
+
+        collect(raw)
+        pc = self._pagecount(raw, vid)
+        base = vid.rstrip('/')
+        # 已知页数就翻到最后一页；未知页数(9999)则翻到空页为止，最多 100 页
+        max_pg = pc if pc and pc != 9999 else 100
+        for pg in range(2, max_pg + 1):
+            try:
+                page_raw = self._get(f'{base}/{pg}')
+            except Exception:
+                break
+            if not collect(page_raw):
+                break
+
         play_from = ''
         play_url = ''
         if episodes:
