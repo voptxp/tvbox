@@ -315,6 +315,33 @@
    "changeable": 0
   },
   {
+   "key": "py_ai_short",
+   "name": "AI短剧[py]",
+   "type": 3,
+   "api": "./py/ai_short.py",
+   "searchable": 1,
+   "quickSearch": 1,
+   "changeable": 0
+  },
+  {
+   "key": "py_ai_beauty",
+   "name": "AI美女[py]",
+   "type": 3,
+   "api": "./py/ai_beauty.py",
+   "searchable": 1,
+   "quickSearch": 1,
+   "changeable": 0
+  },
+  {
+   "key": "py_ai_face",
+   "name": "AI换脸[py]",
+   "type": 3,
+   "api": "./py/ai_face.py",
+   "searchable": 1,
+   "quickSearch": 1,
+   "changeable": 0
+  },
+  {
    "key": "py_蛋挞",
    "name": "蛋挞影视[py]",
    "type": 3,
