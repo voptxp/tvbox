@@ -31,6 +31,10 @@ def _search(kw):
     return '/comic/index/search?keyword=' + quote(kw, safe='')
 
 
+def _hei(path):
+    return '/' + quote(path, safe='/')
+
+
 class Spider(Spider):
 
     host = 'https://91porna.com'
@@ -70,8 +74,17 @@ class Spider(Spider):
         ('短视频·明星大瓜', '/melonshort/mingxing'),
         ('短视频·AI短视频', '/melonshort/ai'),
         # 黑料吃瓜
-        ('黑料吃瓜·推荐', '/%E9%BB%91%E6%96%99%E5%90%83%E7%93%9C/%E6%8E%A8%E8%8D%90'),
-        ('黑料吃瓜·最新', '/%E9%BB%91%E6%96%99%E5%90%83%E7%93%9C/%E6%9C%80%E6%96%B0'),
+        ('黑料吃瓜·推荐', _hei('黑料吃瓜/推荐')),
+        ('黑料吃瓜·最新', _hei('黑料吃瓜/最新')),
+        ('黑料吃瓜·今日吃瓜', _hei('黑料吃瓜/今日吃瓜/最新')),
+        ('黑料吃瓜·学生校园', _hei('黑料吃瓜/学生校园/推荐')),
+        ('黑料吃瓜·明星黑料', _hei('黑料吃瓜/明星黑料/推荐')),
+        ('黑料吃瓜·网红黑料', _hei('黑料吃瓜/网红黑料/推荐')),
+        ('黑料吃瓜·每日大赛', _hei('黑料吃瓜/每日大赛/推荐')),
+        ('黑料吃瓜·名人合集', _hei('黑料吃瓜/名人合集/推荐')),
+        ('黑料吃瓜·必看大瓜', _hei('黑料吃瓜/必看大瓜/推荐')),
+        ('黑料吃瓜·吃瓜新闻', _hei('黑料吃瓜/吃瓜新闻/推荐')),
+        ('黑料吃瓜·反差原创', _hei('黑料吃瓜/反差原创/推荐')),
         # AI成人
         ('AI成人', _search('ai成人')),
         ('AI成人短剧', _search('ai短剧')),
@@ -503,18 +516,51 @@ class Spider(Spider):
         }
 
     def _parse_heiliao(self, vid, raw):
-        name = self._meta_content(raw, 'property="og:title"') or self._title(raw)
+        name = self._clean_title(self._meta_content(raw, 'property="og:title"') or self._title(raw))
         desc = self._meta_content(raw, 'property="og:description"') or name
         pic = self._meta_content(raw, 'property="og:image"')
+        m3u8s = self._heiliao_m3u8(raw)
+        play_from = ''
+        play_url = ''
+        if m3u8s:
+            play_from = '在线'
+            eps = []
+            for i, u in enumerate(m3u8s):
+                label = self._quality_label(u) if len(m3u8s) == 1 else ('视频%d' % (i + 1))
+                eps.append(label + chr(36) + u)
+            play_url = '#'.join(eps)
         return {
             'vod_id': vid,
             'vod_name': name or vid,
             'vod_pic': pic,
             'vod_content': desc or name,
             'vod_remarks': '',
-            'vod_play_from': '',
-            'vod_play_url': '',
+            'vod_play_from': play_from,
+            'vod_play_url': play_url,
         }
+
+    def _heiliao_m3u8(self, raw):
+        out = []
+        seen = set()
+        for decoded in self._unpack_all(raw):
+            m = re.search(r'encodeURIComponent\("([0-9a-f]{60,})"\)', decoded)
+            if not m:
+                continue
+            u = m.group(1)
+            t = int(time.time() / 2100)
+            try:
+                pj = self._get(f'/index/melon_detail_play.js?img=&u={u}&t={t}')
+            except Exception:
+                continue
+            dec = self._unpack(pj)
+            if not dec:
+                dec = pj
+            for u2 in re.findall(r'https?://[^"\'<>\\\s]+\.m3u8[^"\'<>\\\s]*', dec):
+                u2 = unescape(u2).rstrip('\\')
+                if u2 and u2 not in seen:
+                    seen.add(u2)
+                    out.append(u2)
+        return out
 
     # ------------------------------------------------------------------ 播放解析
     def _comic_m3u8(self, detail_url, raw=None):
@@ -567,7 +613,17 @@ class Spider(Spider):
         m = re.search(r"eval\(function\(p,a,c,k,e,d\)\{.*?split\('\|'\),\s*0\s*,\s*\{\}\)\)", text, re.S)
         if not m:
             return ''
-        code = m.group(0)
+        return self._decode_packer(m.group(0))
+
+    def _unpack_all(self, text):
+        out = []
+        for m in re.finditer(r"eval\(function\(p,a,c,k,e,d\)\{.*?split\('\|'\),\s*0\s*,\s*\{\}\)\)", text, re.S):
+            d = self._decode_packer(m.group(0))
+            if d:
+                out.append(d)
+        return out
+
+    def _decode_packer(self, code):
         m2 = re.search(r"\}\('(.*)',(\d+),(\d+),'(.*)'\.split\('\|'\),\s*0\s*,\s*\{\}\)", code, re.DOTALL)
         if not m2:
             return ''
