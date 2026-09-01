@@ -53,7 +53,7 @@ class Spider(Spider):
             headers["Referer"] = referer
         for i in range(3):
             try:
-                r = self.fetch(url, headers=headers, timeout=15, verify=False)
+                r = self.fetch(url, headers=headers, timeout=20, verify=False)
                 if not asjson:
                     return r.text
                 try:
@@ -133,7 +133,7 @@ class Spider(Spider):
         headers = dict(self.headers)
         for i in range(3):
             try:
-                r = self.fetch(url, headers=headers, timeout=15, verify=False)
+                r = self.fetch(url, headers=headers, timeout=20, verify=False)
                 if r.status_code == 200:
                     return r.content
             except Exception:
@@ -149,11 +149,15 @@ class Spider(Spider):
         a = a[0]
         m = re.search(r'/detail/(\d+)/', a.get("href", ""))
         if not m:
-            return None
+            tid = (card.get("data-track-id") or "").strip()
+            if tid.isdigit():
+                m = re.match(r'(\d+)', tid)
+            else:
+                return None
         img = (card.xpath('.//img/@data-src') or card.xpath('.//img/@src') or ["", ""])[0]
         title = "".join(card.xpath('.//*[contains(@class,"hg-drama-card__title")]//text()')).strip()
         if not title:
-            title = a.get("title", "").strip()
+            title = (card.get("data-track-title") or a.get("title") or "").strip()
         if not title:
             return None
         rem = "".join(card.xpath('.//*[contains(@class,"hg-drama-card__episode")]//text()')).strip()
@@ -182,6 +186,8 @@ class Spider(Spider):
             active = [g for g in grids if 'is-active' in (g.get('class') or '')]
             grid = (active or grids or [None])[0]
             nodes = grid.xpath('.//*[contains(@class,"hg-drama-card")]') if grid is not None else []
+        if not nodes:
+            nodes = tree.xpath('//*[contains(@class,"hg-drama-card")]')
         out, seen = [], set()
         for card in nodes:
             try:
