@@ -25,6 +25,8 @@ class Spider(Spider):
 
     host = 'https://mdbdy.com'
 
+    img_proxy = ''
+
     USER_AGENT = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
                   '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
 
@@ -58,6 +60,14 @@ class Spider(Spider):
     def init(self, extend=''):
         self._session = requests.Session()
         self._session.headers.update(self.headers)
+        self.img_proxy = 'http://192.168.0.3/mrds66_img.php'
+        if extend:
+            try:
+                cfg = json.loads(extend) if isinstance(extend, str) else extend
+                if cfg.get('img_proxy'):
+                    self.img_proxy = cfg['img_proxy'].rstrip('/')
+            except Exception:
+                pass
 
     def getName(self):
         pass
@@ -187,7 +197,7 @@ class Spider(Spider):
             if not pm:
                 pm = re.search(r'data-src="(https?://[^"]+)"', block)
             if pm:
-                pic = pm.group(1)
+                pic = self._pic(pm.group(1))
 
             date = ''
             dm = re.search(r'itemprop="datePublished"[^>]*content="([^"]+)"', block)
@@ -211,7 +221,7 @@ class Spider(Spider):
         if not m:
             m = re.search(r'data-bg="(https?://[^"]+)"', raw)
         if m:
-            pic = m.group(1)
+            pic = self._pic(m.group(1))
 
         if not indices:
             indices = ['0']
@@ -252,6 +262,15 @@ class Spider(Spider):
         return d.get('url') or ''
 
     # ------------------------------------------------------------------ 工具
+    def _pic(self, url):
+        if not url:
+            return ''
+        if url.startswith('//'):
+            url = 'https:' + url
+        if self.img_proxy and (url.startswith('https://pic.sbhioa.cn/') or url.startswith('https://pic.xustgq.cn/')):
+            return self.img_proxy + '?url=' + quote(url, safe='')
+        return url
+
     def _meta_content(self, raw, key):
         i = raw.find(key)
         if i < 0:

@@ -330,7 +330,8 @@
    "api": "./py/mdbdy.py",
    "searchable": 1,
    "quickSearch": 1,
-   "changeable": 0
+   "changeable": 0,
+   "ext": {"img_proxy": "http://192.168.0.3/mrds66_img.php"}
   },
   {
    "key": "py_sanji",

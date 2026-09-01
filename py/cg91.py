@@ -268,7 +268,7 @@ class Spider(Spider):
             return ''
         if url.startswith('//'):
             url = 'https:' + url
-        if self.img_proxy and url.startswith('https://pic.hdhwqx.cn/'):
+        if self.img_proxy and (url.startswith('https://pic.hdhwqx.cn/') or url.startswith('https://pic.sbhioa.cn/')):
             return self.img_proxy + '?url=' + quote(url, safe='')
         return url
 
