@@ -324,6 +324,15 @@
    "changeable": 0
   },
   {
+   "key": "py_91md",
+   "name": "91麻豆[py]",
+   "type": 3,
+   "api": "./py/91md.py",
+   "searchable": 1,
+   "quickSearch": 1,
+   "changeable": 0
+  },
+  {
    "key": "py_mdbdy",
    "name": "麻豆不打烊[py]",
    "type": 3,
