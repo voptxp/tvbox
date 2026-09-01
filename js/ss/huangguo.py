@@ -41,6 +41,8 @@ class Spider(Spider):
             {"type_id": "ai-manju", "type_name": "AI成人漫剧"},
             {"type_id": "ai-huanlian", "type_name": "AI换脸"},
             {"type_id": "ai-mogai", "type_name": "AI魔改"},
+            {"type_id": "topics", "type_name": "专题"},
+            {"type_id": "chigua", "type_name": "黄果吃瓜"},
             {"type_id": "ranks/hot", "type_name": "排行榜"},
         ]
 
@@ -177,7 +179,9 @@ class Spider(Spider):
                 nodes.extend(g.xpath('.//*[contains(@class,"hg-drama-card")]'))
         else:
             grids = tree.xpath('//*[contains(@class,"hg-card-grid")]')
-            nodes = grids[0].xpath('.//*[contains(@class,"hg-drama-card")]') if grids else []
+            active = [g for g in grids if 'is-active' in (g.get('class') or '')]
+            grid = (active or grids or [None])[0]
+            nodes = grid.xpath('.//*[contains(@class,"hg-drama-card")]') if grid is not None else []
         out, seen = [], set()
         for card in nodes:
             try:
@@ -226,6 +230,59 @@ class Spider(Spider):
         m = re.search(r'data-panel-total="(\d+)"', html or "")
         return int(m.group(1)) if m else 0
 
+    def _topic_items(self, html):
+        if not html:
+            return []
+        tree = etree.HTML(html)
+        out, seen = [], set()
+        for a in tree.xpath('//a[contains(@class,"hg-topic-card")]'):
+            href = a.get("href", "")
+            if not href or href in seen:
+                continue
+            seen.add(href)
+            img = (a.xpath('.//img/@data-src') or a.xpath('.//img/@src') or ["", ""])[0]
+            title = "".join(a.xpath('.//*[contains(@class,"hg-topic-card__title")]//text()')).strip()
+            if not title:
+                title = (a.xpath('.//img/@alt') or [""])[0]
+            meta = "".join(a.xpath('.//*[contains(@class,"hg-topic-card__meta")]//text()')).strip()
+            out.append({
+                "vod_id": href.strip("/"),
+                "vod_name": title or href,
+                "vod_pic": self._proxy_pic(img),
+                "vod_remarks": meta,
+                "vod_tag": "folder",
+            })
+        return out
+
+    def _chigua_items(self, html):
+        if not html:
+            return []
+        tree = etree.HTML(html)
+        out, seen = [], set()
+        for a in tree.xpath('//a[contains(@class,"hg-post-card")]'):
+            href = a.get("href", "")
+            if not href or href in seen:
+                continue
+            seen.add(href)
+            img = (a.xpath('.//img/@data-src') or a.xpath('.//img/@src') or ["", ""])[0]
+            title = "".join(a.xpath('.//h3//text()')).strip()
+            if not title:
+                title = (a.xpath('.//img/@alt') or [""])[0]
+            meta = "".join(a.xpath('.//*[contains(@class,"hg-post-card__meta")]//text()')).strip()
+            if not title:
+                continue
+            out.append({
+                "vod_id": href,
+                "vod_name": title,
+                "vod_pic": self._proxy_pic(img),
+                "vod_remarks": meta,
+            })
+        return out
+
+    def _chigua_pagecount(self, html):
+        m = re.search(r'第\s*\d+/(\d+)\s*页', html or "")
+        return int(m.group(1)) if m else 1
+
     # ---------- 接口 ----------
     def homeContent(self, filter):
         return {"class": self.categories, "list": self._cards(self._get(self.host), all_grids=True), "filters": {}}
@@ -236,6 +293,16 @@ class Spider(Spider):
     def categoryContent(self, tid, pg, filter, extend):
         pg = int(pg or 1)
         tid = str(tid).strip("/")
+        if tid == "topics":
+            return {"page": 1, "pagecount": 1, "limit": 24, "total": 24, "list": self._topic_items(self._get(f"{self.host}/topics/"))}
+        if tid.startswith("topics/"):
+            slug = tid[len("topics/"):]
+            url = f"{self.host}/topics/{slug}/" if pg == 1 else f"{self.host}/topics/{slug}/?page={pg}"
+            return {"page": pg, "pagecount": 9999, "limit": 24, "total": 99999, "list": self._cards(self._get(url))}
+        if tid == "chigua":
+            url = f"{self.host}/chigua/" if pg == 1 else f"{self.host}/chigua/page/{pg}/"
+            html = self._get(url)
+            return {"page": pg, "pagecount": self._chigua_pagecount(html), "limit": 20, "total": 99999, "list": self._chigua_items(html)}
         if "rank" in tid:
             url = f"{self.host}/{tid}/" if pg == 1 else f"{self.host}/{tid}/{pg}/"
             return {"page": pg, "pagecount": 9999, "limit": 20, "total": 99999, "list": self._rank_items(self._get(url))}
@@ -248,6 +315,11 @@ class Spider(Spider):
 
     def detailContent(self, ids):
         vid = str(ids[0])
+        if "/archives/" in vid:
+            html = self._get(self._fix(vid))
+            if not html:
+                return {"list": []}
+            return {"list": [self._chigua_detail(vid, html)]}
         html = self._get(f"{self.host}/detail/{vid}/")
         result = {"list": []}
         if not html:
@@ -299,12 +371,48 @@ class Spider(Spider):
         result["list"].append(info)
         return result
 
+    def _chigua_detail(self, vid, html):
+        tree = etree.HTML(html)
+        name = "".join(tree.xpath('//h1/text()')).strip()
+        if not name:
+            mm = re.search(r'<title>(.*?)</title>', html, re.S)
+            name = mm.group(1).strip().split(" - ")[0].strip() if mm else ""
+        pic = "".join(tree.xpath('//meta[@property="og:image"]/@content')).strip()
+        desc = "".join(tree.xpath('//meta[@property="og:description"]/@content')).strip()
+        eps = []
+        for pnode in tree.xpath('//*[contains(@class,"post-video-player")]'):
+            src = pnode.get("data-src", "")
+            if src and ".m3u8" in src:
+                eps.append(src)
+        play_from = ""
+        play_url = ""
+        if eps:
+            play_from = "黄果吃瓜"
+            if len(eps) == 1:
+                play_url = "高清" + chr(36) + eps[0]
+            else:
+                play_url = "#".join(f"第{i+1}集{chr(36)}{u}" for i, u in enumerate(eps))
+        return {
+            "vod_id": vid,
+            "vod_name": name or vid,
+            "vod_pic": self._proxy_pic(pic),
+            "vod_play_from": play_from,
+            "vod_play_url": play_url,
+            "vod_content": desc or name,
+        }
+
     def searchContent(self, key, quick, pg="1"):
         url = f"{self.host}/search/video/{quote(key)}/"
         return {"list": self._cards(self._get(url)), "page": int(pg or 1)}
 
     def playerContent(self, flag, id, vipFlags):
         url = self._fix(id)
+        header = {
+            "User-Agent": self.headers.get("User-Agent", "Mozilla/5.0"),
+            "Referer": self.host + "/",
+        }
+        if ".m3u8" in url:
+            return {"parse": 0, "url": url, "header": header}
         play = ""
         html = self._get(url, referer=self.host)
         if html:
@@ -324,10 +432,6 @@ class Spider(Spider):
             if not play.startswith("http"):
                 mm2 = re.search(r'(https?://[^\s"\']+)', play)
                 play = mm2.group(1) if mm2 else ""
-        header = {
-            "User-Agent": self.headers.get("User-Agent", "Mozilla/5.0"),
-            "Referer": self.host + "/",
-        }
         return {"parse": 0, "url": play, "header": header}
 
     def localProxy(self, param):
