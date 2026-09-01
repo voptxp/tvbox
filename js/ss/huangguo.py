@@ -176,28 +176,61 @@ class Spider(Spider):
     def _cards(self, html, all_grids=False):
         if not html:
             return []
-        tree = etree.HTML(html)
-        if all_grids:
-            nodes = []
-            for g in tree.xpath('//*[contains(@class,"hg-card-grid")]'):
-                nodes.extend(g.xpath('.//*[contains(@class,"hg-drama-card")]'))
-        else:
-            grids = tree.xpath('//*[contains(@class,"hg-card-grid")]')
-            active = [g for g in grids if 'is-active' in (g.get('class') or '')]
-            grid = (active or grids or [None])[0]
-            nodes = grid.xpath('.//*[contains(@class,"hg-drama-card")]') if grid is not None else []
-        if not nodes:
-            nodes = tree.xpath('//*[contains(@class,"hg-drama-card")]')
-        out, seen = [], set()
-        for card in nodes:
-            try:
-                item = self._card(card)
-                if not item or item["vod_id"] in seen:
+        try:
+            tree = etree.HTML(html)
+            if all_grids:
+                nodes = []
+                for g in tree.xpath('//*[contains(@class,"hg-card-grid")]'):
+                    nodes.extend(g.xpath('.//*[contains(@class,"hg-drama-card")]'))
+            else:
+                grids = tree.xpath('//*[contains(@class,"hg-card-grid")]')
+                active = [g for g in grids if 'is-active' in (g.get('class') or '')]
+                grid = (active or grids or [None])[0]
+                nodes = grid.xpath('.//*[contains(@class,"hg-drama-card")]') if grid is not None else []
+            if not nodes:
+                nodes = tree.xpath('//*[contains(@class,"hg-drama-card")]')
+            out, seen = [], set()
+            for card in nodes:
+                try:
+                    item = self._card(card)
+                    if not item or item["vod_id"] in seen:
+                        continue
+                    seen.add(item["vod_id"])
+                    out.append(item)
+                except Exception:
                     continue
-                seen.add(item["vod_id"])
-                out.append(item)
-            except Exception:
+            if out:
+                return out
+        except Exception:
+            pass
+        return self._cards_regex(html)
+
+    def _cards_regex(self, html):
+        out, seen = [], set()
+        for m in re.finditer(r'data-track-id="(\d+)"', html or ""):
+            vid = m.group(1)
+            if vid in seen:
                 continue
+            seg = html[m.start():m.start() + 1500]
+            tm = re.search(r'data-track-title="([^"]*)"', seg)
+            if not tm:
+                continue
+            title = tm.group(1).strip()
+            if not title:
+                continue
+            seen.add(vid)
+            img = ""
+            im = re.search(r'data-src="(https?://[^"]+)"', seg)
+            if im:
+                img = im.group(1)
+            rem = ""
+            rm = re.search(r'hg-drama-card__episode[^>]*>([^<]*)<', seg)
+            if rm:
+                rem = rm.group(1).strip()
+            sc = re.search(r'hg-drama-card__score[^>]*>([^<]*)<', seg)
+            if sc:
+                rem = (rem + " · " if rem else "") + sc.group(1).strip()
+            out.append({"vod_id": vid, "vod_name": title, "vod_pic": self._proxy_pic(img), "vod_remarks": rem})
         return out
 
     def _rank_items(self, html):
