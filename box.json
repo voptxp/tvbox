@@ -315,6 +315,15 @@
    "changeable": 0
   },
   {
+   "key": "py_avtime",
+   "name": "AV时间[py]",
+   "type": 3,
+   "api": "./py/avtime.py",
+   "searchable": 0,
+   "quickSearch": 0,
+   "changeable": 0
+  },
+  {
    "key": "py_mdbdy",
    "name": "麻豆不打烊[py]",
    "type": 3,
