@@ -149,18 +149,17 @@ class Spider(Spider):
     # ------------------------------------------------------------------ 解析
     def _getlist(self, html):
         out, seen = [], set()
-        for m in re.finditer(r'<a[^>]*href="https://njavtv\.com/([a-z0-9-]+)"[^>]*>\s*([^<]{5,})\s*</a>', html):
-            dvd_id = m.group(1)
-            title = unescape(m.group(2)).strip()
-            if dvd_id in seen or not title:
+        for m in re.finditer(r'<a[^>]*class="[^"]*text-secondary[^"]*"[^>]*href="https://njavtv\.com/([a-z0-9_./-]+)"[^>]*>(.*?)</a>', html, re.S):
+            path = m.group(1).strip('/')
+            title = unescape(re.sub(r'<[^>]+>', '', m.group(2))).strip()
+            if not title or path in seen:
                 continue
-            if not re.search(r'\d', dvd_id):
-                continue
-            seen.add(dvd_id)
+            seen.add(path)
+            last = path.split('/')[-1]
             out.append({
-                'vod_id': f'{self.host}/{dvd_id}',
+                'vod_id': f'{self.host}/{path}',
                 'vod_name': title,
-                'vod_pic': f'https://fourhoi.com/{dvd_id}/cover-n.jpg',
+                'vod_pic': f'https://fourhoi.com/{last}/cover-n.jpg',
                 'vod_remarks': '',
             })
         return out
