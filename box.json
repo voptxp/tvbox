@@ -333,6 +333,16 @@
    "changeable": 0
   },
   {
+   "key": "py_njavtv",
+   "name": "nJAV[py]",
+   "type": 3,
+   "api": "./py/njavtv.py",
+   "searchable": 1,
+   "quickSearch": 1,
+   "changeable": 0,
+   "ext": {"proxy": "http://192.168.0.3:12316/"}
+  },
+  {
    "key": "py_mdbdy",
    "name": "麻豆不打烊[py]",
    "type": 3,
