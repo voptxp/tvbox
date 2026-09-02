@@ -25,7 +25,32 @@ class Spider(Spider):
     proxy = 'http://192.168.0.3:12316/'
 
     CATEGORIES = [
-        ('nJAV', 'dm339'),
+        ('中文字幕', 'dm278/chinese-subtitle'),
+        ('最近更新', 'dm539/new'),
+        ('新作更新', 'dm635/release'),
+        ('无码流出', 'dm817/uncensored-leak'),
+        ('SIRO', 'dm36/siro'),
+        ('LUXU', 'dm34/luxu'),
+        ('GANA', 'dm34/gana'),
+        ('PRESTIGE PREMIUM', 'dm1004/maan'),
+        ('S-cute', 'dm38/scute'),
+        ('ARA', 'dm34/ara'),
+        ('FC2', 'dm597/fc2'),
+        ('HEYZO', 'dm2208642/heyzo'),
+        ('东京热', 'dm42/tokyohot'),
+        ('一本道', 'dm5199603/1pondo'),
+        ('Caribbeancom', 'dm7704788/caribbeancom'),
+        ('Caribbeancompr', 'dm91887/caribbeancompr'),
+        ('10musume', 'dm7208981/10musume'),
+        ('pacopacomama', 'dm3600557/pacopacomama'),
+        ('Gachinco', 'dm150/gachinco'),
+        ('XXX-AV', 'dm42/xxxav'),
+        ('人妻斬', 'dm37/marriedslash'),
+        ('頑皮4610', 'dm33/naughty4610'),
+        ('頑皮0930', 'dm37/naughty0930'),
+        ('麻豆傳媒', 'dm63/madou'),
+        ('TWAV AV', 'dm31/twav'),
+        ('中国直播', 'clive'),
     ]
 
     def init(self, extend=''):
@@ -76,16 +101,24 @@ class Spider(Spider):
 
     def categoryContent(self, tid, pg, filter, extend):
         pg = int(pg or 1)
-        tid = (tid or 'dm339').strip().strip('/')
+        tid = (tid or 'dm278/chinese-subtitle').strip().strip('/')
         url = f'{self.host}/{tid}'
+        if pg > 1:
+            url += f'?page={pg}'
         raw = self._get(url, referer=self.host + '/')
+        lst = self._getlist(raw)
+        pc = self._pagecount(raw)
         return {
-            'list': self._getlist(raw),
+            'list': lst,
             'page': pg,
-            'pagecount': 1,
-            'limit': len(self._getlist(raw)),
-            'total': len(self._getlist(raw)),
+            'pagecount': pc,
+            'limit': len(lst),
+            'total': pc * len(lst) if lst else 0,
         }
+
+    def _pagecount(self, raw):
+        nums = [int(x) for x in re.findall(r'page=(\d+)', raw)]
+        return max(nums) if nums else 1
 
     def detailContent(self, ids):
         vid = (ids[0] if ids else '').strip()
