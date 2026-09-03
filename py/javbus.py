@@ -16,6 +16,7 @@ import re
 import json
 import sys
 import requests
+import threading
 from urllib.parse import quote
 from pyquery import PyQuery as pq
 
@@ -161,6 +162,7 @@ class Spider(Spider):
             ref = ids[0] if ids[0].startswith('http') else self.host + ids[0]
             mag_html = self._get(f'/ajax/uncledatoolsbyajax.php?gid={gid_m.group(1)}&uc={uc}&lang=zh', referer=ref)
             magnets = self._parse_magnets(pq(mag_html))
+            self._warm_magnets(magnets)
 
         play_from = ''
         play_url = ''
@@ -235,6 +237,20 @@ class Spider(Spider):
             return self.img_proxy + '?url=' + quote(url, safe='')
         return url
 
+    def _warm_magnets(self, magnets):
+        if not self.stream_proxy or not magnets:
+            return
+        def _warm_one(url):
+            try:
+                requests.get(self.stream_proxy + '/warm?magnet=' + quote(url, safe=''), timeout=5)
+            except Exception:
+                pass
+        for m in magnets[:5]:
+            try:
+                threading.Thread(target=_warm_one, args=(m['url'],), daemon=True).start()
+            except Exception:
+                pass
+
     def _with_trackers(self, url):
         if '&tr=' in url:
             return url
@@ -289,4 +305,5 @@ class Spider(Spider):
                 'vod_remarks': date,
             })
         return videos
+
 
