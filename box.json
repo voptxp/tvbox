@@ -231,6 +231,19 @@
    }
   },
   {
+  "key": "py_javbus-http",
+  "name": "JavBus磁力-HTTP[py]",
+  "type": 3,
+  "api": "./py/javbus.py",
+  "quickSearch": 1,
+  "searchable": 1,
+  "filterable": 0,
+  "ext": {
+    "img_proxy": "http://192.168.0.3/javbus_img.php",
+    "stream_proxy": "http://192.168.0.3:8888"
+   }
+  },
+  {
    "key": "py_xchina",
    "name": "xChina[py]",
    "type": 3,
