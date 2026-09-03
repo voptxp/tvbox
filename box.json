@@ -239,9 +239,8 @@
   "searchable": 1,
   "filterable": 0,
   "ext": {
-    "img_proxy": "http://192.168.0.3/javbus_img.php",
-    "stream_proxy": "http://192.168.0.3:8888"
-   }
+    "img_proxy": "http://192.168.0.3/javbus_img.php"
+    }
   },
   {
   "key": "py_xiaoyakankan",
