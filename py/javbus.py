@@ -55,10 +55,12 @@ class Spider(Spider):
 
     def init(self, extend=''):
         self.img_proxy = ''
+        self.stream_proxy = ''
         if extend:
             try:
                 cfg = json.loads(extend) if isinstance(extend, str) else extend
                 self.img_proxy = (cfg.get('img_proxy') or '').rstrip('/')
+                self.stream_proxy = (cfg.get('stream_proxy') or '').rstrip('/')
             except Exception:
                 pass
 
@@ -199,6 +201,8 @@ class Spider(Spider):
     def playerContent(self, flag, id, vipFlags):
         url = id
         if url.startswith('magnet:'):
+            if self.stream_proxy:
+                return {'parse': 0, 'jx': 0, 'url': self.stream_proxy + '/stream?magnet=' + quote(url, safe=''), 'header': {}}
             url = self._with_trackers(url)
             return {'parse': 0, 'jx': 0, 'url': url, 'header': {}}
         if url.startswith('ed2k:') or url.startswith('thunder:'):
