@@ -231,18 +231,6 @@
    }
   },
   {
-  "key": "py_javbus",
-  "name": "JavBus磁力[py]",
-  "type": 3,
-  "api": "./py/javbus.py",
-  "quickSearch": 1,
-  "searchable": 1,
-  "filterable": 0,
-  "ext": {
-    "img_proxy": "http://192.168.0.3/javbus_img.php"
-    }
-  },
-  {
   "key": "py_xiaoyakankan",
   "name": "小鸭看看[py]",
   "type": 3,
