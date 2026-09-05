@@ -55,6 +55,13 @@ class Spider(Spider):
     def init(self, extend=''):
         self._session = requests.Session()
         self._session.headers.update(self.headers)
+        self.img_proxy = ''
+        if extend:
+            try:
+                cfg = json.loads(extend) if isinstance(extend, str) else extend
+                self.img_proxy = (cfg.get('img_proxy') or '').rstrip('/')
+            except Exception:
+                pass
 
     def getName(self):
         pass
@@ -105,6 +112,14 @@ class Spider(Spider):
             return 'https:' + url
         if url.startswith('/'):
             return self.host + url
+        return url
+
+    def _pic(self, url):
+        url = self._abs(url)
+        if not url:
+            return ''
+        if self.img_proxy and url.startswith(self.host + '/upload/'):
+            return self.img_proxy + '?url=' + quote(url, safe='')
         return url
 
     # ------------------------------------------------------------------ TVBox 接口
@@ -194,7 +209,7 @@ class Spider(Spider):
             pic = ''
             pm = re.search(r'data-original="([^"]+\.(?:jpg|png|jpeg))"', block, re.I)
             if pm:
-                pic = self._abs(pm.group(1))
+                pic = self._pic(pm.group(1))
 
             remark = ''
             rm = re.search(r'<p class="tc_wz">([^<]*)</p>', block)
@@ -230,7 +245,7 @@ class Spider(Spider):
             pic = ''
             pm = re.search(r'data-original="([^"]+)"', block)
             if pm:
-                pic = self._abs(pm.group(1))
+                pic = self._pic(pm.group(1))
 
             remark = ''
             ym = re.search(r'\((\d{4})\)', block)
@@ -260,7 +275,7 @@ class Spider(Spider):
         pic = ''
         pm = re.search(r'data-original="(/upload/vod/[^"]+)"', raw)
         if pm:
-            pic = self._abs(pm.group(1))
+            pic = self._pic(pm.group(1))
 
         # 简介
         desc = ''
@@ -348,4 +363,5 @@ class Spider(Spider):
             except Exception:
                 return unquote(url)
         return url
+
 
