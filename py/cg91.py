@@ -12,9 +12,15 @@
 # 全部用字符串解析，不依赖 lxml/pyquery，避免 TVBox 内置环境编码误判报错。
 import json
 import sys
+import time
 import requests
 from html import unescape
 from urllib.parse import quote
+try:
+    import urllib3
+    urllib3.disable_warnings()
+except Exception:
+    pass
 
 sys.path.append('..')
 from base.spider import Spider
@@ -24,6 +30,14 @@ class Spider(Spider):
 
     host = 'https://www.91cg1.com'
 
+    FALLBACK_HOSTS = [
+        'https://www.91cg1.com',
+        'https://www4.91cg1.com',
+        'https://www6.91cg1.com',
+        'https://cn.91cg1.com',
+        'https://2.91cg1.com',
+    ]
+
     img_proxy = ''
 
     USER_AGENT = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
@@ -32,6 +46,8 @@ class Spider(Spider):
     headers = {
         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        'cache-control': 'no-cache',
+        'pragma': 'no-cache',
         'user-agent': USER_AGENT,
         'referer': 'https://www.91cg1.com/',
     }
@@ -66,18 +82,22 @@ class Spider(Spider):
 
     def init(self, extend=''):
         self._session = requests.Session()
+        self._session.verify = False
         self._session.headers.update(self.headers)
         self.img_proxy = 'http://192.168.0.3/cg91_img.php'
         if extend:
             try:
                 cfg = json.loads(extend) if isinstance(extend, str) else extend
+                if cfg.get('host'):
+                    self.host = str(cfg['host']).rstrip('/')
                 if cfg.get('img_proxy'):
                     self.img_proxy = cfg['img_proxy'].rstrip('/')
             except Exception:
                 pass
+        self._set_host(self.host)
 
     def getName(self):
-        pass
+        return '91吃瓜'
 
     def isVideoFormat(self, url):
         pass
@@ -89,12 +109,47 @@ class Spider(Spider):
         pass
 
     # ------------------------------------------------------------------ 网络层
-    def _get(self, path, referer=None):
+    def _set_host(self, host):
+        host = (host or '').rstrip('/')
+        if host:
+            self.host = host
+        try:
+            self._session.headers.update({
+                'referer': self.host + '/',
+                'origin': self.host,
+            })
+        except Exception:
+            pass
+
+    def _get(self, path, referer=None, tries=2):
         url = path if path.startswith('http') else f'{self.host}{path}'
         h = {'referer': referer} if referer else {}
-        r = self._session.get(url, headers=h, timeout=15)
-        r.encoding = 'utf-8'
-        return r.text
+        last_exc = None
+        for attempt in range(tries):
+            try:
+                r = self._session.get(url, headers=h, timeout=15, verify=False)
+                r.raise_for_status()
+                r.encoding = 'utf-8'
+                return r.text
+            except Exception as e:
+                last_exc = e
+                if attempt < tries - 1:
+                    time.sleep(0.4 * (attempt + 1))
+        # 主域名失败时尝试其它官方线路（仅相对路径）
+        if not path.startswith('http'):
+            for host in self.FALLBACK_HOSTS:
+                host = host.rstrip('/')
+                if host == self.host:
+                    continue
+                try:
+                    r = self._session.get(host + path, headers=h, timeout=12, verify=False)
+                    r.raise_for_status()
+                    r.encoding = 'utf-8'
+                    self._set_host(host)
+                    return r.text
+                except Exception:
+                    continue
+        return ''
 
     # ------------------------------------------------------------------ TVBox 接口
     def homeContent(self, filter):
