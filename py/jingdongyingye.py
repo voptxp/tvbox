@@ -133,10 +133,24 @@ class Spider(Spider):
     def liveContent(self, url):
         pass
 
+    def _html_pic_map(self, html):
+        m = {}
+        pat = re.compile(
+            r'<a[^>]+href="((?:/comic/index/(?:detail|avdetail)\?video_key=[^"]+|/melonshort/video/\d+|/moviesets/[^"]+))"[^>]*>([\s\S]*?)</a>',
+            re.S)
+        for mm in pat.finditer(html):
+            href = mm.group(1)
+            block = mm.group(2)
+            pm = re.search(r'data-src="(https?://[^"]+)"', block)
+            if pm:
+                m[self.host + href] = pm.group(1)
+        return m
+
     # ------------------------------------------------------------------ 列表解析
     def _getlist(self, html):
         out = []
         seen = set()
+        html_pics = self._html_pic_map(html)
         for m in re.finditer(r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', html, re.S):
             data = m.group(1).strip()
             if 'ItemList' not in data:
@@ -153,10 +167,13 @@ class Spider(Spider):
                 if '/comic/index/detail' not in url or url in seen:
                     continue
                 seen.add(url)
+                pic = it.get('pic') or ''
+                if url in html_pics:
+                    pic = html_pics[url]
                 remark = (it.get('date') or '').strip()
                 if len(remark) > 10:
                     remark = remark[:10]
-                out.append({'vod_id': url, 'vod_name': it.get('name') or '', 'vod_pic': self._pic(it.get('pic') or ''), 'vod_remarks': remark})
+                out.append({'vod_id': url, 'vod_name': it.get('name') or '', 'vod_pic': self._pic(pic), 'vod_remarks': remark})
             if out:
                 return out
         return out
