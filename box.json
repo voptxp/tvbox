@@ -291,7 +291,7 @@
    "searchable": 1,
    "filterable": 0,
    "ext": {
-    "img_proxy": "http://192.168.0.3/hanpian_img.php"
+    "img_proxy": "http://192.168.0.3/cg91_img.php"
    }
   },
   {
@@ -315,7 +315,7 @@
    "searchable": 1,
    "filterable": 0,
    "ext": {
-    "img_proxy": "http://192.168.0.3/hanpian_img.php"
+    "img_proxy": "http://192.168.0.3/cg91_img.php"
    }
   },
   {
@@ -372,7 +372,7 @@
    "searchable": 1,
    "quickSearch": 1,
    "changeable": 0,
-   "ext": {"img_proxy": "http://192.168.0.3/hanpian_img.php"}
+   "ext": {"img_proxy": "http://192.168.0.3/cg91_img.php"}
   },
   {
    "key": "py_sanji",
