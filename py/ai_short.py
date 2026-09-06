@@ -34,6 +34,14 @@ class Spider(Spider):
     def init(self, extend=''):
         self._session = requests.Session()
         self._session.headers.update(self.headers)
+        self.img_proxy = ''
+        if extend:
+            try:
+                cfg = json.loads(extend) if isinstance(extend, str) else extend
+                if cfg.get('img_proxy'):
+                    self.img_proxy = cfg['img_proxy'].rstrip('/')
+            except Exception:
+                pass
 
     def getName(self):
         pass
@@ -54,6 +62,15 @@ class Spider(Spider):
         r = self._session.get(url, headers=h, timeout=20)
         r.encoding = 'utf-8'
         return r.text
+
+    def _pic(self, url):
+        if not url:
+            return ''
+        if url.startswith('//'):
+            url = 'https:' + url
+        if self.img_proxy and url.startswith('https://pic.'):
+            return self.img_proxy + '?url=' + quote(url, safe='')
+        return url
 
     # ------------------------------------------------------------------ TVBox 接口
     def homeContent(self, filter):
@@ -138,7 +155,7 @@ class Spider(Spider):
                 pic = mm.group(1)
             if not title:
                 title = '视频'
-            out.append({'vod_id': self.host + url, 'vod_name': title, 'vod_pic': pic, 'vod_remarks': ''})
+            out.append({'vod_id': self.host + url, 'vod_name': title, 'vod_pic': self._pic(pic), 'vod_remarks': ''})
         return out
 
     def _pagecount(self, raw):
@@ -168,7 +185,7 @@ class Spider(Spider):
         return {
             'vod_id': vid,
             'vod_name': self._clean_title(name) or vid,
-            'vod_pic': pic,
+            'vod_pic': self._pic(pic),
             'vod_content': desc or name,
             'vod_remarks': rel,
             'vod_play_from': play_from,
