@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # by @嗷呜
+import re
 import sys
 from pyquery import PyQuery as pq
 sys.path.append('..')
@@ -23,7 +24,7 @@ class Spider(Spider):
     def destroy(self):
         pass
 
-    # 站点近期在 Cloudflare 后加了拦截: 首次访问(无 Cookie)返回 403 并下发
+    # 站点在 Cloudflare 后加了拦截: 首次访问(无 Cookie)返回 403 并下发
     # Set-Cookie(langID / ASP.NET_SessionId), 带上 Cookie 刷新后才会放行,
     # 等价于浏览器“第一次打开 403, 刷新后正常”。
     # 因此这里统一保存并回传 Cookie, 首次请求若被 403 拦截会自动带 Cookie 重试一次。
@@ -44,6 +45,22 @@ class Spider(Spider):
     }
 
     host = "https://4k-av.com"
+
+    # /movie/ 页面提供的细分标签(站点标签页同时含电影与剧集, 排序与分类页相同)
+    movie_tags = [
+        ('动作', '/tag/%E5%8A%A8%E4%BD%9C/'),
+        ('剧情', '/tag/%E5%89%A7%E6%83%85/'),
+        ('冒险', '/tag/%E5%86%92%E9%99%A9/'),
+        ('喜剧', '/tag/%E5%96%9C%E5%89%A7/'),
+        ('国产剧', '/tag/%E5%9B%BD%E4%BA%A7%E5%89%A7/'),
+        ('恐怖', '/tag/%E6%81%90%E6%80%96/'),
+        ('战争', '/tag/%E6%88%98%E4%BA%89/'),
+        ('科幻', '/tag/%E7%A7%91%E5%B9%BB/'),
+        ('动画', '/tag/%E5%8A%A8%E7%94%BB/'),
+        ('韩剧', '/tag/%E9%9F%A9%E5%89%A7/'),
+        ('犯罪', '/tag/%E7%8A%AF%E7%BD%AA/'),
+        ('纪录片', '/tag/%E7%BA%AA%E5%BD%95%E7%89%87/'),
+    ]
 
     # ---------- Cookie 管理 ----------
     def _cookie_jar(self):
@@ -97,6 +114,34 @@ class Spider(Spider):
         except Exception:
             return ''
 
+    # ---------- 分页排序处理 ----------
+    # 站点分页是“倒序”的: page-1.html 是最旧, 页码越大越新,
+    # 分类根页(如 /tv/、/movie/、/tag/xx/)就是最后一页=最新。
+    # TVBox 习惯第一页看最新, 因此把 TVBox 第 pg 页映射到站点第 (total-pg+1) 页,
+    # 第 1 页直接取分类根页。
+    def _cat_state(self):
+        if not hasattr(self, '_cat'):
+            self._cat = {}
+        return self._cat
+
+    def _parse_page_total(self, text):
+        try:
+            m = re.search(r'页次\s*(\d+)\s*/\s*(\d+)', text or '')
+            if m:
+                return int(m.group(2))
+        except Exception:
+            pass
+        return 0
+
+    def _ensure_category(self, tid):
+        tid = tid if tid.endswith('/') else '{}/'.format(tid)
+        st = self._cat_state()
+        if tid not in st:
+            root_text = self._fetch_text(tid)   # 根页=最新, 同时可解析出总页数
+            total = self._parse_page_total(root_text)
+            st[tid] = {'total': total if total > 0 else 1, 'root': root_text}
+        return st[tid]
+
     def homeContent(self, filter):
         data = self.getpq()
         result = {}
@@ -106,6 +151,9 @@ class Spider(Spider):
                 'type_name': k.text(),
                 'type_id': k('a').attr('href')
             })
+        # 追加 /movie/ 页上的细分标签分类
+        for name, href in self.movie_tags:
+            classes.append({'type_name': name, 'type_id': href})
         result['class'] = classes
         result['list'] = self.getlist(data('#MainContent_scrollul ul li'), '.poster span')
         return result
@@ -114,13 +162,29 @@ class Spider(Spider):
         pass
 
     def categoryContent(self, tid, pg, filter, extend):
-        data = self.getpq('{}{}page-{}.html'.format(tid, '' if tid.endswith('/') else '/', pg))
+        tid = tid if tid.endswith('/') else '{}/'.format(tid)
+        try:
+            pg = int(pg)
+        except Exception:
+            pg = 1
+        if pg < 1:
+            pg = 1
+        st = self._ensure_category(tid)
+        total = st['total']
+        if pg == 1:
+            text = st['root'] or self._fetch_text(tid)
+        else:
+            n = total - pg + 1
+            if n < 1:
+                n = 1
+            text = self._fetch_text('{}page-{}.html'.format(tid, n))
+        data = pq(text or '')
         result = {}
         result['list'] = self.getlist(data('#MainContent_newestlist .virow .NTMitem'))
         result['page'] = pg
-        result['pagecount'] = 9999
+        result['pagecount'] = total if total > 0 else 1
         result['limit'] = 90
-        result['total'] = 999999
+        result['total'] = total * 90
         return result
 
     def detailContent(self, ids):
