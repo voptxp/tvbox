@@ -376,6 +376,21 @@
    "ext": {"img_proxy": "http://192.168.0.3/cg91_img.php"}
   },
   {
+   "key": "精品资源站",
+   "name": "精品 | 采集",
+   "type": 1,
+   "api": "https://www.jingpinx.com/api.php/provide/vod/",
+   "ext": "proxy"
+  },
+  {
+   "key": "女优色库",
+   "name": "女优色库[py]",
+   "type": 3,
+   "filterable": 0,
+   "changeable": 0,
+   "api": "./js/ss/女优色库.py"
+  },
+  {
    "key": "py_sanji",
    "name": "三级片[py]",
    "type": 3,
