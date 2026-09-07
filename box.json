@@ -495,6 +495,33 @@
    "ext": ""
   },
   {
+      "key": "*番号资源",
+      "name": "[111ms|apple] 🔞番号资源",
+      "type": 1,
+      "api": "http://fhapi9.com/api.php/provide/vod/",
+      "searchable": 0,
+      "quickSearch": 0,
+      "filterable": 0
+    },
+    {
+      "key": "ms4nii",
+      "name": "[111ms|apple] 美少女资源(已修复)",
+      "type": 0,
+      "api": "https://www.msnii.com/api/xml.php",
+      "searchable": 1,
+      "quickSearch": 1,
+      "filterable": 1
+    },
+    {
+      "key": "KxrbspE",
+      "name": "[111ms|apple] 淫水机资源(已修复)",
+      "type": 0,
+      "api": "https://www.xrbsp.com/api/xml.php",
+      "searchable": 1,
+      "quickSearch": 1,
+      "filterable": 1
+    },
+  {
    "key": "py_蛋挞",
    "name": "蛋挞影视[py]",
    "type": 3,
