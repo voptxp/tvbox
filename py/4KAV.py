@@ -23,19 +23,82 @@ class Spider(Spider):
     def destroy(self):
         pass
 
+    # 站点近期在 Cloudflare 后加了拦截: 首次访问(无 Cookie)返回 403 并下发
+    # Set-Cookie(langID / ASP.NET_SessionId), 带上 Cookie 刷新后才会放行,
+    # 等价于浏览器“第一次打开 403, 刷新后正常”。
+    # 因此这里统一保存并回传 Cookie, 首次请求若被 403 拦截会自动带 Cookie 重试一次。
+    # 请求头改为与 UA 匹配的现代桌面 Chrome, 避免 UA / sec-ch-ua 不一致被识别为机器人。
     headers = {
         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
-        'sec-ch-ua': '"Not/A)Brand";v="8", "Chromium";v="134", "Google Chrome";v="134"',
-        'sec-ch-ua-platform': '"macOS"',
+        'accept-encoding': 'gzip, deflate',
+        'sec-ch-ua': '"Chromium";v="152", "Not?A_Brand";v="24", "Google Chrome";v="152"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
         'sec-fetch-dest': 'document',
-        'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.8 Mobile/15E148 Safari/604.1'
+        'sec-fetch-mode': 'navigate',
+        'sec-fetch-site': 'none',
+        'sec-fetch-user': '?1',
+        'upgrade-insecure-requests': '1',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36'
     }
 
     host = "https://4k-av.com"
 
+    # ---------- Cookie 管理 ----------
+    def _cookie_jar(self):
+        if not hasattr(self, '_ck'):
+            self._ck = {}
+        return self._ck
+
+    def _save_cookies(self, resp):
+        try:
+            jar = getattr(resp, 'cookies', None)
+            if jar is not None:
+                for c in jar:
+                    self._cookie_jar()[c.name] = c.value
+        except Exception:
+            pass
+
+    def _cookie_str(self):
+        ck = self._cookie_jar()
+        if not ck:
+            return ''
+        return '; '.join('{}={}'.format(k, v) for k, v in ck.items())
+
+    def _fetch_text(self, path=''):
+        url = path if path.startswith('http') else '{}{}'.format(self.host, path or '')
+        resp = None
+        for _ in range(2):  # 第一次无 Cookie -> 403 + Set-Cookie; 第二次带 Cookie -> 放行(等同手动刷新)
+            try:
+                ck = self._cookie_jar()
+                if ck:
+                    resp = self.fetch(url, headers=self.headers, cookies=dict(ck))
+                else:
+                    resp = self.fetch(url, headers=self.headers)
+            except TypeError:
+                # 部分运行环境/本地调试桩的 fetch() 不支持 cookies 参数
+                try:
+                    resp = self.fetch(url, headers=self.headers)
+                except Exception:
+                    resp = None
+            except Exception:
+                resp = None
+            if resp is None:
+                break
+            self._save_cookies(resp)
+            try:
+                if resp.status_code == 200:
+                    break
+            except Exception:
+                break
+        try:
+            return (resp.text if resp is not None else '') or ''
+        except Exception:
+            return ''
+
     def homeContent(self, filter):
-        data=self.getpq()
+        data = self.getpq()
         result = {}
         classes = []
         for k in list(data('#category ul li').items())[:-1]:
@@ -44,14 +107,14 @@ class Spider(Spider):
                 'type_id': k('a').attr('href')
             })
         result['class'] = classes
-        result['list'] = self.getlist(data('#MainContent_scrollul ul li'),'.poster span')
+        result['list'] = self.getlist(data('#MainContent_scrollul ul li'), '.poster span')
         return result
 
     def homeVideoContent(self):
         pass
 
     def categoryContent(self, tid, pg, filter, extend):
-        data=self.getpq(f"{tid}page-{pg}.html")
+        data = self.getpq('{}{}page-{}.html'.format(tid, '' if tid.endswith('/') else '/', pg))
         result = {}
         result['list'] = self.getlist(data('#MainContent_newestlist .virow .NTMitem'))
         result['page'] = pg
@@ -73,33 +136,39 @@ class Spider(Spider):
             'vod_play_url': ''
         }
         vlist = data('#rtlist li')
-        jn = f"{vod['vod_name']}_" if 'EP0' in vlist.eq(0)('span').text() else ''
+        jn = '{}_'.format(vod['vod_name']) if 'EP0' in vlist.eq(0)('span').text() else ''
         if vlist:
-            c = [f"{jn}{i('span').text()}${i('a').attr('href')}" for i in list(vlist.items())[1:]]
-            c.insert(0, f"{jn}{vlist.eq(0)('span').text()}${ids[0]}")
+            c = ['{}{}${}'.format(jn, i('span').text(), i('a').attr('href')) for i in list(vlist.items())[1:]]
+            c.insert(0, '{}{}${}'.format(jn, vlist.eq(0)('span').text(), ids[0]))
             vod['vod_play_url'] = '#'.join(c)
         else:
-            vod['vod_play_url'] = f"{vod['vod_name']}${ids[0]}"
+            vod['vod_play_url'] = '{}$'.format(vod['vod_name']) + ids[0]
         return {'list': [vod]}
 
     def searchContent(self, key, quick, pg="1"):
-        data=self.getpq(f"/s?x={key}")
-        return {'list':self.getlist(data('#MainContent_newestlist .virow.search .NTMitem.Main'))}
+        # 站点搜索表单字段名为 y(旧版为 x/k)
+        data = self.getpq('/s?y={}'.format(key))
+        return {'list': self.getlist(data('#MainContent_newestlist .virow.search .NTMitem.Main'))}
 
     def playerContent(self, flag, id, vipFlags):
         try:
-            data=self.getpq(id)
-            p,url=0,data('#MainContent_videowindow source').attr('src')
-            if not url:raise Exception("未找到播放地址")
+            data = self.getpq(id)
+            p, url = 0, data('#MainContent_videowindow source').attr('src')
+            if not url:
+                raise Exception("未找到播放地址")
         except Exception as e:
-            p,url=1,f"{self.host}{id}"
+            p, url = 1, '{}{}'.format(self.host, id)
         headers = {
             'origin': self.host,
-            'referer': f'{self.host}/',
-            'sec-ch-ua-platform': '"macOS"',
-            'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.8 Mobile/15E148 Safari/604.1',
+            'referer': '{}/'.format(self.host),
+            'sec-ch-ua': self.headers['sec-ch-ua'],
+            'sec-ch-ua-platform': self.headers['sec-ch-ua-platform'],
+            'user-agent': self.headers['user-agent'],
         }
-        return  {'parse': p, 'url': url, 'header': headers}
+        ck = self._cookie_str()
+        if ck:
+            headers['cookie'] = ck
+        return {'parse': p, 'url': url, 'header': headers}
 
     def localProxy(self, param):
         pass
@@ -107,7 +176,7 @@ class Spider(Spider):
     def liveContent(self, url):
         pass
 
-    def getlist(self,data,y='.resyear label[title="分辨率"]'):
+    def getlist(self, data, y='.resyear label[title="分辨率"]'):
         videos = []
         for i in data.items():
             ns = i('.title h2').text().split(' ')
@@ -121,10 +190,9 @@ class Spider(Spider):
         return videos
 
     def getpq(self, path=''):
-        url=f"{self.host}{path}"
-        data=self.fetch(url,headers=self.headers).text
+        data = self._fetch_text(path)
         try:
             return pq(data)
         except Exception as e:
-            print(f"{str(e)}")
+            print(str(e))
             return pq(data.encode('utf-8'))
