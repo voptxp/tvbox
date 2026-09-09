@@ -16,6 +16,15 @@
    "api": "./js/荐片.js"
   },
   {
+  "key": "seeddog",
+  "name": "seeddog",
+  "type": 1,
+  "api": "http://192.168.0.3:8787/api.php/provide/vod/?ac=list",
+  "quickSearch": 1,
+  "searchable": 1,
+  "filterable": 0
+  },
+  {
    "key": "py_dygangs",
    "name": "电影港[磁]",
    "type": 3,
