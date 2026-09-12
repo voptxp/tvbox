@@ -25,15 +25,6 @@
   "filterable": 0
   },
   {
-    "key": "seeddog-http",
-    "name": "seeddog-http",
-    "type": 1,
-    "api": "http://192.168.0.3:8790/api.php/provide/vod/?ac=list",
-    "quickSearch": 1,
-    "searchable": 1,
-    "filterable": 0
-  },
-  {
    "key": "py_dygangs",
    "name": "电影港[磁]",
    "type": 3,
