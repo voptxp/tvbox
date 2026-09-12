@@ -513,6 +513,15 @@
       "filterable": 0
   },
   {
+      "key": "sehuatang2",
+      "name": "sehuatang2",
+      "type": 1,
+      "api": "http://192.168.0.3:8789/api.php/provide/vod/?ac=list",
+      "quickSearch": 1,
+      "searchable": 1,
+      "filterable": 0
+  },
+  {
       "key": "*番号资源",
       "name": "[111ms|apple] 🔞番号资源",
       "type": 1,
